@@ -294,12 +294,9 @@ public:
     ASTPtr getCreateDatabaseQuery(const String & database_name) const;
 
     DatabasePtr getDatabase(const String & database_name) const;
-    DatabasePtr getDatabase(const String & database_name);
     DatabasePtr tryGetDatabase(const String & database_name) const;
-    DatabasePtr tryGetDatabase(const String & database_name);
 
     Databases getDatabases() const;
-    Databases getDatabases();
 
     std::shared_ptr<Context> acquireSession(
         const String & session_id,
@@ -505,7 +502,7 @@ private:
 class SessionCleaner
 {
 public:
-    SessionCleaner(Context & context_)
+    explicit SessionCleaner(Context & context_)
         : context{context_}
     {}
     ~SessionCleaner();
