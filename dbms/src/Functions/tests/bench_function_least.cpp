@@ -315,7 +315,7 @@ try
     auto context = DB::tests::TiFlashTestEnv::getContext();
     for (auto _ : state)
     {
-        executeFunction(context, func_name, col1, col2, col3);
+        executeFunction(context, func_name, {col1, col2, col3}, nullptr, true);
     }
 }
 CATCH
@@ -329,7 +329,7 @@ try
     auto context = DB::tests::TiFlashTestEnv::getContext();
     for (auto _ : state)
     {
-        executeFunction(context, func_name, col1, col2);
+        executeFunction(context, func_name, {col1, col2}, nullptr, true);
     }
 }
 CATCH
@@ -343,7 +343,7 @@ try
     auto context = DB::tests::TiFlashTestEnv::getContext();
     for (auto _ : state)
     {
-        executeFunction(context, func_name, col_nullable1, col_nullable2, col_nullable3);
+        executeFunction(context, func_name, {col_nullable1, col_nullable2, col_nullable3}, nullptr, true);
     }
 }
 CATCH
@@ -372,7 +372,7 @@ try
     auto context = DB::tests::TiFlashTestEnv::getContext();
     for (auto _ : state)
     {
-        executeFunction(context, func_name, v_col);
+        executeFunction(context, func_name, {v_col}, nullptr, true);
     }
 }
 CATCH
