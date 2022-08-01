@@ -18,11 +18,11 @@
 #include <Common/typeid_cast.h>
 #include <Core/Names.h>
 #include <Storages/ColumnsDescription.h>
-#include <Storages/Transaction/DatumCodec.h>
 #include <Storages/Transaction/DecodingStorageSchemaSnapshot.h>
 #include <Storages/Transaction/Region.h>
 #include <Storages/Transaction/RegionDataRead.h>
-#include <Storages/Transaction/RowCodec.h>
+#include <TiDB/Codec/DatumCodec.h>
+#include <TiDB/Codec/RowCodec.h>
 
 namespace TiDB
 {

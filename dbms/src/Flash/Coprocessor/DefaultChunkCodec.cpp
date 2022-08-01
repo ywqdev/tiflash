@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #include <Flash/Coprocessor/DefaultChunkCodec.h>
-#include <Storages/Transaction/Datum.h>
-#include <Storages/Transaction/DatumCodec.h>
 #include <Storages/Transaction/TiDB.h>
 #include <Storages/Transaction/TypeMapping.h>
+#include <TiDB/Codec/Datum.h>
+#include <TiDB/Codec/DatumCodec.h>
 
 using TiDB::DatumBumpy;
 using TiDB::DatumFlat;
@@ -67,7 +67,7 @@ Block DefaultChunkCodec::decode(const String & data, const DAGSchema & schema)
     }
 
     ColumnsWithTypeAndName columns;
-    for (auto & field : schema)
+    for (const auto & field : schema)
     {
         const auto & name = field.first;
         auto data_type = getDataTypeByColumnInfoForComputingLayer(field.second);

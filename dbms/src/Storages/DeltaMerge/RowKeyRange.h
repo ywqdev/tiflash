@@ -19,12 +19,12 @@
 #include <IO/WriteHelpers.h>
 #include <Storages/DeltaMerge/DeltaMergeDefines.h>
 #include <Storages/DeltaMerge/DeltaMergeHelpers.h>
-#include <Storages/Transaction/DatumCodec.h>
 #include <Storages/Transaction/RegionRangeKeys.h>
 #include <Storages/Transaction/TiDB.h>
 #include <Storages/Transaction/TiKVKeyValue.h>
 #include <Storages/Transaction/TiKVRecordFormat.h>
 #include <Storages/Transaction/Types.h>
+#include <TiDB/Codec/DatumCodec.h>
 
 namespace DB::DM
 {
@@ -130,12 +130,12 @@ struct RowKeyValue
         return std::make_shared<DecodedTiKVKey>(prefix + *value);
     }
 
-    bool operator==(const RowKeyValue & v)
+    bool operator==(const RowKeyValue & v) const
     {
         return is_common_handle == v.is_common_handle && (*value) == (*v.value) && int_value == v.int_value;
     }
 
-    RowKeyValue toPrefixNext()
+    RowKeyValue toPrefixNext() const
     {
         std::vector<UInt8> keys(value->begin(), value->end());
         int index = keys.size() - 1;
@@ -180,14 +180,14 @@ struct RowKeyValue
         return RowKeyValue(is_common_handle, start_ptr);
     }
 
-    bool is_common_handle;
+    bool is_common_handle{};
     /// In case of non common handle, the value field is redundant in most cases, except that int_value == Int64::max_value,
     /// because RowKeyValue is an end point of RowKeyRange, assuming that RowKeyRange = [start_value, end_value), since the
     /// end_value of RowKeyRange is always exclusive, if we want to construct a RowKeyRange that include Int64::max_value,
     /// just set end_value.int_value to Int64::max_value is not enough, we still need to set end_value.value a carefully
     /// designed value. You can refer to INT_HANDLE_MAX_KEY for more details
     HandleValuePtr value;
-    Int64 int_value;
+    Int64 int_value{};
 
     static const RowKeyValue INT_HANDLE_MIN_KEY;
     static const RowKeyValue INT_HANDLE_MAX_KEY;
@@ -357,7 +357,7 @@ struct RowKeyColumnContainer
     }
 };
 
-namespace
+namespace // // NOLINT(google-build-namespaces)
 {
 // https://en.cppreference.com/w/cpp/algorithm/lower_bound
 size_t lowerBound(const RowKeyColumnContainer & rowkey_column, size_t first, size_t last, const RowKeyValueRef & value)
@@ -378,7 +378,6 @@ size_t lowerBound(const RowKeyColumnContainer & rowkey_column, size_t first, siz
     return first;
 }
 } // namespace
-
 /// A range denoted as [StartRowKey, EndRowKey).
 struct RowKeyRange
 {
@@ -643,7 +642,7 @@ struct RowKeyRange
         return {start.int_value, end.int_value};
     }
 
-    std::pair<DecodedTiKVKeyPtr, DecodedTiKVKeyPtr> toRegionRange(TableID table_id)
+    std::pair<DecodedTiKVKeyPtr, DecodedTiKVKeyPtr> toRegionRange(TableID table_id) const
     {
         // FIXME: move this to TiKVRecordFormat.h
         WriteBufferFromOwnString ss;
@@ -774,7 +773,7 @@ struct RowKeyRange
 
     bool operator==(const RowKeyRange & rhs) const
     {
-        return start.value->compare(*rhs.start.value) == 0 && end.value->compare(*rhs.end.value) == 0;
+        return *start.value == *rhs.start.value && *end.value == *rhs.end.value;
     }
     bool operator!=(const RowKeyRange & rhs) const { return !(*this == rhs); }
 }; // struct RowKeyRange
@@ -784,7 +783,7 @@ using RowKeyRanges = std::vector<RowKeyRange>;
 inline String toDebugString(const RowKeyRanges & ranges)
 {
     String s = "{";
-    for (auto & r : ranges)
+    for (const auto & r : ranges)
     {
         s += r.toDebugString() + ",";
     }
@@ -797,7 +796,7 @@ inline String toDebugString(const RowKeyRanges & ranges)
 inline RowKeyRange mergeRanges(const RowKeyRanges & ranges, bool is_common_handle, size_t rowkey_column_size)
 {
     RowKeyRange range = RowKeyRange::newNone(is_common_handle, rowkey_column_size);
-    for (auto & r : ranges)
+    for (const auto & r : ranges)
     {
         range.start = min(range.start, r.start);
         range.end = max(range.end, r.end);

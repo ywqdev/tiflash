@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Storages/Transaction/DatumCodec.h>
-#include <Storages/Transaction/JSONCodec.h>
+#include <TiDB/Codec/DatumCodec.h>
+#include <TiDB/Codec/JSONCodec.h>
 
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-parameter"
@@ -107,7 +107,7 @@ inline String decodeString(size_t & cursor, const String & raw_value);
 JsonVar decodeValue(UInt8 type, size_t & cursor, const String & raw_value);
 
 // Below funcs decode via relative offset and base offset does not move
-JsonVar decodeValueEntry(size_t base, const String & raw_value, size_t value_offset);
+JsonVar decodeValueEntry(size_t base, const String & raw_value, size_t value_entry_offset);
 inline String decodeString(size_t base, const String & raw_value, size_t length);
 
 template <typename T>
@@ -120,7 +120,7 @@ inline T decodeNumeric(size_t & cursor, const String & raw_value)
 
 JsonObjectPtr decodeObject(size_t & cursor, const String & raw_value)
 {
-    UInt32 element_count = decodeNumeric<UInt32>(cursor, raw_value);
+    auto element_count = decodeNumeric<UInt32>(cursor, raw_value);
     size_t size = decodeNumeric<UInt32>(cursor, raw_value);
     size_t base = cursor;
     JsonObjectPtr obj_ptr = new Poco::JSON::Object();
@@ -143,7 +143,7 @@ JsonObjectPtr decodeObject(size_t & cursor, const String & raw_value)
 
 JsonArrayPtr decodeArray(size_t & cursor, const String & raw_value)
 {
-    UInt32 element_count = decodeNumeric<UInt32>(cursor, raw_value);
+    auto element_count = decodeNumeric<UInt32>(cursor, raw_value);
     size_t size = decodeNumeric<UInt32>(cursor, raw_value);
 
     JsonArrayPtr array_ptr = new Poco::JSON::Array();
@@ -229,25 +229,25 @@ String DecodeJsonAsString(size_t & cursor, const String & raw_value)
 }
 
 template <bool doDecode>
-struct need_decode
+struct NeedDecode
 {
 };
 
 
 template <>
-struct need_decode<true>
+struct NeedDecode<true>
 {
-    typedef String type;
+    using type = String;
 };
 
 template <>
-struct need_decode<false>
+struct NeedDecode<false>
 {
-    typedef void type;
+    using type = void;
 };
 
 template <bool doDecode>
-typename need_decode<doDecode>::type DecodeJson(size_t & cursor, const String & raw_value)
+typename NeedDecode<doDecode>::type DecodeJson(size_t & cursor, const String & raw_value)
 {
     size_t base = cursor;
     UInt8 type = raw_value[cursor++];
@@ -282,9 +282,9 @@ typename need_decode<doDecode>::type DecodeJson(size_t & cursor, const String & 
     size++;
     cursor = base + size;
     if (!doDecode)
-        return static_cast<typename need_decode<doDecode>::type>(0);
+        return static_cast<typename NeedDecode<doDecode>::type>("");
     else
-        return static_cast<typename need_decode<doDecode>::type>(raw_value.substr(base, size));
+        return static_cast<typename NeedDecode<doDecode>::type>(raw_value.substr(base, size));
 }
 
 void SkipJson(size_t & cursor, const String & raw_value)

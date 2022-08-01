@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <Common/TiFlashException.h>
-#include <Storages/Transaction/DatumCodec.h>
+#include <TiDB/Codec/DatumCodec.h>
 #include <TiDB/Schema/SchemaGetter.h>
 #include <pingcap/kv/Scanner.h>
 

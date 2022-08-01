@@ -47,11 +47,11 @@
 #include <Poco/StringTokenizer.h>
 #include <Storages/IManageableStorage.h>
 #include <Storages/MutableSupport.h>
-#include <Storages/Transaction/Datum.h>
 #include <Storages/Transaction/KVStore.h>
 #include <Storages/Transaction/Region.h>
 #include <Storages/Transaction/TMTContext.h>
 #include <Storages/Transaction/TypeMapping.h>
+#include <TiDB/Codec/Datum.h>
 #include <tipb/select.pb.h>
 
 #include <utility>

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <Storages/Transaction/RowCodec.h>
+#include <TiDB/Codec/RowCodec.h>
 #include <gtest/gtest.h>
 
 #include "RowCodecTestUtils.h"
@@ -71,7 +71,7 @@ TEST(RowV2Suite, FloatValue)
     ASSERT_FLOAT_VALUE(std::numeric_limits<Float64>::max());
 }
 
-#define ASSERT_STRING_VALUE_LENGTH(b, s) ASSERT_EQ(getValueLengthByRowV2<b>(s), std::make_tuple(s, s.length()))
+#define ASSERT_STRING_VALUE_LENGTH(b, s) ASSERT_EQ(getValueLengthByRowV2<b>(s), std::make_tuple(s, (s).length()))
 
 TEST(RowV2Suite, StringValueLength)
 {

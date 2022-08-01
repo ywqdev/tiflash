@@ -20,7 +20,6 @@
 
 namespace DB
 {
-using TiDB::ColumnInfo;
 using TiDB::TableInfo;
 
 /// The following two encode functions are used for testing.

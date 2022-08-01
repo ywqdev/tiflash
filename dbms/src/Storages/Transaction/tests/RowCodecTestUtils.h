@@ -14,8 +14,8 @@
 
 #pragma once
 #include <Storages/Transaction/DecodingStorageSchemaSnapshot.h>
-#include <Storages/Transaction/RowCodec.h>
 #include <Storages/Transaction/TypeMapping.h>
+#include <TiDB/Codec/RowCodec.h>
 
 namespace DB::tests
 {
@@ -146,7 +146,7 @@ struct ColumnIDValue<T, true>
 {
     static constexpr bool value_is_null = true;
     using ValueType = std::decay_t<T>;
-    ColumnIDValue(ColumnID id_)
+    explicit ColumnIDValue(ColumnID id_)
         : id(id_)
     {}
     ColumnID id;
@@ -272,7 +272,7 @@ inline DecodingStorageSchemaSnapshotConstPtr getDecodingStorageSchemaSnapshot(co
     store_columns.emplace_back(VERSION_COLUMN_ID, VERSION_COLUMN_NAME, VERSION_COLUMN_TYPE);
     store_columns.emplace_back(TAG_COLUMN_ID, TAG_COLUMN_NAME, TAG_COLUMN_TYPE);
     ColumnID handle_id = EXTRA_HANDLE_COLUMN_ID;
-    for (auto & column_info : table_info.columns)
+    for (const auto & column_info : table_info.columns)
     {
         if (table_info.pk_is_handle)
         {
@@ -301,7 +301,7 @@ size_t valueStartPos(const TableInfo & table_info)
 
 inline Block decodeRowToBlock(const String & row_value, DecodingStorageSchemaSnapshotConstPtr decoding_schema)
 {
-    auto & sorted_column_id_with_pos = decoding_schema->sorted_column_id_with_pos;
+    const auto & sorted_column_id_with_pos = decoding_schema->sorted_column_id_with_pos;
     auto iter = sorted_column_id_with_pos.begin();
     const size_t value_column_num = 3;
     // skip first three column which is EXTRA_HANDLE_COLUMN, VERSION_COLUMN, TAG_COLUMN
