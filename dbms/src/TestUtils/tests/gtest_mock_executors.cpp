@@ -185,7 +185,7 @@ try
     auto request = left_builder.build(context);
     {
         String expected = "limit_8 | 10\n"
-                          " Join_7 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}\n"
+                          " Join_7 | LeftOuterJoin, HashJoin. left_join_keys: {<2, String>}, right_join_keys: {<1, String>}\n"
                           "  topn_6 | order_by: {(<0, Long>, desc: false)}, limit: 10\n"
                           "   table_scan_5 | {<0, Long>, <1, String>, <2, String>}\n"
                           "  topn_4 | order_by: {(<2, String>, desc: false)}, limit: 10\n"

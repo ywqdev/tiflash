@@ -19,6 +19,10 @@
 #include <TestUtils/executorSerializer.h>
 #include <tipb/executor.pb.h>
 #include <tipb/expression.pb.h>
+
+#include <cstddef>
+
+#include "common/types.h"
 namespace DB::tests
 {
 namespace
@@ -46,6 +50,22 @@ String getColumnTypeName(const Column column)
     return name;
 }
 
+template <typename Column>
+Int64 getColumnIndex(const Column column, Int64 idx)
+{
+    if constexpr (IsExpr<Column>::value == true)
+    {
+        std::cout << "ywq test: reach here..." << std::endl;
+        return decodeDAGInt64(column.val());
+    }
+    else
+    {
+        std::cout << "ywq test: reach here2..." << std::endl;
+
+        return idx;
+    }
+}
+
 template <typename Columns>
 void toString(const Columns & columns, FmtBuffer & buf)
 {
@@ -53,9 +73,9 @@ void toString(const Columns & columns, FmtBuffer & buf)
     int bound = columns.size() - 1;
     for (int i = 0; i < bound; ++i)
     {
-        buf.fmtAppend("<{}, {}>, ", i, getColumnTypeName(columns.at(i)));
+        buf.fmtAppend("<{}, {}>, ", getColumnIndex(columns.at(i), i), getColumnTypeName(columns.at(i)));
     }
-    buf.fmtAppend("<{}, {}>", bound, getColumnTypeName(columns.at(bound)));
+    buf.fmtAppend("<{}, {}>", getColumnIndex(columns.at(bound), bound), getColumnTypeName(columns.at(bound)));
 }
 } // namespace
 
