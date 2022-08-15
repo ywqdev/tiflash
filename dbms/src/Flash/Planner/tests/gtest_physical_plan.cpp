@@ -112,7 +112,7 @@ public:
             ASSERT_EQ(Poco::trim(expected_streams), Poco::trim(fb.toString()));
         }
 
-        ASSERT_COLUMNS_EQ_R(expect_columns, readBlock(final_stream));
+        ASSERT_COLUMNS_EQ_UR(expect_columns, readBlock(final_stream));
     }
 
     std::tuple<DAGRequestBuilder, DAGRequestBuilder, DAGRequestBuilder, DAGRequestBuilder> multiTestScan()

@@ -54,16 +54,9 @@ template <typename Column>
 Int64 getColumnIndex(const Column column, Int64 idx)
 {
     if constexpr (IsExpr<Column>::value == true)
-    {
-        std::cout << "ywq test: reach here..." << std::endl;
         return decodeDAGInt64(column.val());
-    }
     else
-    {
-        std::cout << "ywq test: reach here2..." << std::endl;
-
         return idx;
-    }
 }
 
 template <typename Columns>
