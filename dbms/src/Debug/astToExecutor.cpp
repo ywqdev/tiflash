@@ -999,6 +999,11 @@ bool Aggregation::toTiPBExecutor(tipb::Executor * tipb_executor, int32_t collato
         for (const auto & arg : func->arguments->children)
         {
             tipb::Expr * arg_expr = agg_func->add_children();
+            std::cout << "ywq test agg:" << std::endl;
+            for (auto c : input_schema)
+            {
+                std::cout << c.first << ":" << c.second.name << std::endl;
+            }
             astToPB(input_schema, arg, arg_expr, collator_id, context);
         }
         auto agg_sig_it = agg_func_name_to_sig.find(func->name);
@@ -1074,6 +1079,11 @@ void Aggregation::columnPrune(std::unordered_set<String> & used_columns)
     {
         collectUsedColumnsFromExpr(children[0]->output_schema, gby_expr, used_input_columns);
     }
+    std::cout << "ywq test agg column prune: " << std::endl;
+    for (auto s : used_input_columns)
+    {
+        std::cout << s << std::endl;
+    }
     children[0]->columnPrune(used_input_columns);
 }
 
@@ -1106,6 +1116,10 @@ void Aggregation::toMPPSubPlan(size_t & executor_index, const DAGProperties & pr
     std::shared_ptr<ExchangeSender> exchange_sender
         = std::make_shared<ExchangeSender>(executor_index, output_schema_for_partial_agg, partition_keys.empty() ? tipb::PassThrough : tipb::Hash, partition_keys);
     exchange_sender->children.push_back(partial_agg);
+
+    std::cout << "ywq test output_schema_for_partial_agg" << std::endl;
+    for (auto s : output_schema_for_partial_agg)
+        std::cout << s.first << std::endl;
 
     std::shared_ptr<ExchangeReceiver> exchange_receiver
         = std::make_shared<ExchangeReceiver>(executor_index, output_schema_for_partial_agg);
@@ -1181,6 +1195,11 @@ void Project::columnPrune(std::unordered_set<String> & used_columns)
             collectUsedColumnsFromExpr(children[0]->output_schema, expr, used_input_columns);
         }
     }
+    std::cout << "ywq test used in project." << std::endl;
+    for (auto c : used_input_columns)
+    {
+        std::cout << c << std::endl;
+    }
     children[0]->columnPrune(used_input_columns);
 }
 
@@ -1237,8 +1256,15 @@ void Join::columnPrune(std::unordered_set<String> & used_columns)
     children[0]->columnPrune(left_used_columns);
     children[1]->columnPrune(right_used_columns);
 
+    std::cout << "ywq test join left used columns" << std::endl;
+    for (auto s : left_used_columns)
+        std::cout << s << std::endl;
+    std::cout << "ywq test join right used columns" << std::endl;
+    for (auto s : right_used_columns)
+        std::cout << s << std::endl;
+
     /// update output schema
-    output_schema.clear();
+    // output_schema.clear(); // this is a bug...
 
     for (auto & field : children[0]->output_schema)
     {
@@ -1330,6 +1356,12 @@ bool Join::toTiPBExecutor(tipb::Executor * tipb_executor, int32_t collator_id, c
         astToPB(merged_children_schema, expr, cond, collator_id, context);
     }
 
+    std::cout << "ywq join children schema: " << std::endl;
+    for (auto s : merged_children_schema)
+    {
+        std::cout << s.first << std::endl;
+    }
+
     auto * left_child_executor = join->add_children();
     children[0]->toTiPBExecutor(left_child_executor, collator_id, mpp_info, context);
     auto * right_child_executor = join->add_children();
@@ -1371,6 +1403,14 @@ void Join::toMPPSubPlan(size_t & executor_index, const DAGProperties & propertie
         push_back_partition_key(left_partition_keys, children[0]->output_schema, key);
         push_back_partition_key(right_partition_keys, children[1]->output_schema, key);
     }
+
+    std::cout << "ywq test join tompp subplan children[0] schema:" << std::endl;
+    for (auto s : children[0]->output_schema)
+        std::cout << s.first << std::endl;
+
+    std::cout << "ywq test join tompp subplan children[1] schema:" << std::endl;
+    for (auto s : children[1]->output_schema)
+        std::cout << s.first << std::endl;
 
     std::shared_ptr<ExchangeSender> left_exchange_sender
         = std::make_shared<ExchangeSender>(executor_index, children[0]->output_schema, tipb::Hash, left_partition_keys);

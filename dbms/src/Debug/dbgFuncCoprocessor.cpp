@@ -573,6 +573,11 @@ struct QueryFragment
             dag_request.add_output_offsets(i);
         auto * root_tipb_executor = dag_request.mutable_root_executor();
         root_executor->toTiPBExecutor(root_tipb_executor, properties.collator, mpp_info, context);
+        std::cout << "ywq test to query task schema: " << std::endl;
+        for (auto s: root_executor->output_schema)
+        {
+            std::cout <<s.first << std::endl;
+        }
         return QueryTask(dag_request_ptr, table_id, root_executor->output_schema, mpp_info.sender_target_task_ids.empty() ? DAG : MPP_DISPATCH, mpp_info.task_id, mpp_info.partition_id, is_top_fragment);
     }
 

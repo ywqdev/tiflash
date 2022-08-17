@@ -117,6 +117,9 @@ QueryTasks DAGRequestBuilder::buildMPPTasks(MockDAGRequestContext & mock_context
     properties.is_mpp_query = true;
     properties.mpp_partition_num = mpp_partition_num;
     mock_context.context.setMPPTest();
+    std::cout << "ywq test before split tasks" << std::endl;
+    for (auto s : root->output_schema)
+        std::cout << s.first << std::endl;
     auto query_tasks = queryPlanToQueryTasks(properties, root, executor_index, mock_context.context);
     root.reset();
     executor_index = 0;
