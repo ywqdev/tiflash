@@ -109,13 +109,10 @@ void columnPrune(ExecutorPtr executor)
 
 // Split a DAGRequest into multiple QueryTasks which can be dispatched to multiple Compute nodes.
 // Currently we don't support window functions
-QueryTasks DAGRequestBuilder::buildMPPTasks(MockDAGRequestContext & mock_context, int mpp_partition_num)
+QueryTasks DAGRequestBuilder::buildMPPTasks(MockDAGRequestContext & mock_context, DAGProperties & properties)
 {
-    RUNTIME_ASSERT(mpp_partition_num != 0, "should not build mpp tasks with mpp_partition_num = 0");
+    // RUNTIME_ASSERT(mpp_partition_num != 0, "should not build mpp tasks with mpp_partition_num = 0");
     columnPrune(root);
-    // enable mpp
-    properties.is_mpp_query = true;
-    properties.mpp_partition_num = mpp_partition_num;
     mock_context.context.setMPPTest();
     std::cout << "ywq test before split tasks" << std::endl;
     for (auto s : root->output_schema)

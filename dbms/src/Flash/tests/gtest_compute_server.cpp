@@ -15,7 +15,10 @@
 #include <Common/FailPoint.h>
 #include <TestUtils/MPPTaskTestUtils.h>
 
+#include <chrono>
 #include <cstddef>
+#include <optional>
+#include <thread>
 
 #include "Common/Exception.h"
 #include "TestUtils/executorSerializer.h"
@@ -29,6 +32,18 @@ extern const char random_aggregate_merge_failpoint[];
 } // namespace FailPoints
 namespace tests
 {
+
+class MockTsGenerator : public ext::Singleton<MockTsGenerator>
+{
+public:
+    Int64 nextTs()
+    {
+        return ++current_ts;
+    }
+
+private:
+    std::atomic<UInt64> current_ts = 0;
+};
 class ComputeServerRunner : public DB::tests::MPPTaskTestUtils
 {
 public:
@@ -50,6 +65,20 @@ public:
             {"test_db", "r_table"},
             {{"s", TiDB::TP::TypeString}, {"join_c", TiDB::TP::TypeString}},
             {toNullableVec<String>("s", {"banana", {}, "banana"}), toNullableVec<String>("join_c", {"apple", {}, "banana"})});
+
+        std::vector<std::optional<String>> col1;
+        for (size_t i = 0; i < 1000000; i++)
+        {
+            col1.push_back("appple");
+        }
+        context.addMockTable(
+            {"test_db", "l_table_1"},
+            {{"s", TiDB::TP::TypeString}, {"join_c", TiDB::TP::TypeString}},
+            {toNullableVec<String>("s", col1), toNullableVec<String>("join_c", col1)});
+        context.addMockTable(
+            {"test_db", "r_table_1"},
+            {{"s", TiDB::TP::TypeString}, {"join_c", TiDB::TP::TypeString}},
+            {toNullableVec<String>("s", col1), toNullableVec<String>("join_c", col1)});
     }
 };
 
@@ -58,7 +87,7 @@ try
 {
     startServers({"0.0.0.0:3930", "0.0.0.0:3931", "0.0.0.0:3932", "0.0.0.0:3933"});
     fiu_init(0);
-    // fiu_enable_random(FailPoints::random_aggregate_create_state_failpoint, 1, nullptr, 0, 1);
+    fiu_enable_random(FailPoints::random_aggregate_create_state_failpoint, 1, nullptr, 0, 1);
     // fiu_enable_random(FailPoints::random_aggregate_merge_failpoint, 1, nullptr, 0, 1);
 
     {
@@ -111,32 +140,75 @@ try
         //         }
 
         // auto expected_cols = {toNullableVec<Int32>({1, {}, 10000000, 10000000})};
-        for (size_t j = 0; j < 1; ++j)
-        {
-            MockComputeServerManager::instance().resetMockMPPServerInfo(1);
-            auto tasks = context
-                             .scan("test_db", "l_table")
-                             .join(context.scan("test_db", "r_table"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")})
-                             .aggregation({Max(col("l_table.s"))}, {col("l_table.s")})
-                             .project({col("max(l_table.s)"), col("l_table.s")})
-                             .buildMPPTasks(context, 1);
-            std::cout << "ywq test splitted tasks" << std::endl;
-            for (auto task: tasks)
-            {
-                std::cout << ExecutorSerializer().serialize(task.dag_request.get()) << std::endl;
-            }
-            TiFlashTestEnv::getGlobalContext().setMPPTest();
-            MockComputeServerManager::instance().setMockStorage(context.mockStorage());
+        WRAP_FOR_DIS_ENABLE_PLANNER_BEGIN
+
+        MockComputeServerManager::instance().resetMockMPPServerInfo(1);
+        // auto tasks = context
+        //                  .scan("test_db", "l_table")
+        //                  .join(context.scan("test_db", "r_table"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")})
+        //                  .aggregation({Max(col("l_table.s"))}, {col("l_table.s")})
+        //                  .project({col("max(l_table.s)"), col("l_table.s")})
+        //                  .buildMPPTasks(context, 1);
+        // std::cout << "ywq test splitted tasks" << std::endl;
+        // for (auto task : tasks)
+        // {
+        //     std::cout << ExecutorSerializer().serialize(task.dag_request.get()) << std::endl;
+        // }
+        TiFlashTestEnv::getGlobalContext().setMPPTest();
+        MockComputeServerManager::instance().setMockStorage(context.mockStorage());
+
+        auto run_agg = [&] {
             try
             {
-                executeMPPTasks(tasks, MockComputeServerManager::instance().getServerConfigMap());
+                std::cout << "ywq test called..." << std::endl;
+                DAGProperties properties;
+                // enable mpp
+                properties.is_mpp_query = true;
+                properties.mpp_partition_num = 1;
+                properties.start_ts = MockTsGenerator::instance().nextTs();
+
+                // auto tasks = context.scan("test_db", "test_table_1")
+                //                  .aggregation({Max(col("s1"))}, {col("s2"), col("s3")})
+                //                  .project({"max(s1)"})
+                //                  .buildMPPTasks(context, properties);
+                // auto expected_cols = {toNullableVec<Int32>({1, {}, 10000000, 10000000})};
+                // ASSERT_COLUMNS_EQ_UR(executeMPPTasks(tasks, properties, MockComputeServerManager::instance().getServerConfigMap()), expected_cols);
+
+
+                auto tasks = context
+                                 .scan("test_db", "l_table_1")
+                                 .join(context.scan("test_db", "r_table_1"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")})
+                                 .aggregation({Max(col("l_table.s"))}, {col("l_table.s")})
+                                 .project({col("max(l_table.s)"), col("l_table.s")})
+                                 .buildMPPTasks(context, properties);
+
+                size_t task_size = tasks.size();
+                for (size_t i = 0; i < task_size; ++i)
+                {
+                    std::cout << ExecutorSerializer().serialize(tasks[i].dag_request.get()) << std::endl;
+                }
+                executeMPPTasks(tasks, properties, MockComputeServerManager::instance().getServerConfigMap());
             }
-            catch (...)
+            catch (Exception & e)
             {
-                ::DB::tryLogCurrentException(__PRETTY_FUNCTION__);
+                std::cout << e.getStackTrace().toString() << std::endl;
             }
+        };
+        // std::thread thd(run_agg);
+        // thd.join();
+        std::vector<std::thread> threads;
+        for (size_t j = 0; j < 10; j++)
+        {
+            threads.push_back(std::thread(run_agg));
         }
+        for (size_t j = 0; j < 10; ++j)
+        {
+            threads[j].join();
+        }
+        WRAP_FOR_DIS_ENABLE_PLANNER_END
     }
+
+    // std::this_thread::sleep_for(std::chrono::seconds(10));
 
     //     {
     //         auto tasks = context.scan("test_db", "test_table_1")
@@ -180,84 +252,84 @@ try
 }
 CATCH
 
-TEST_F(ComputeServerRunner, runJoinTasks)
-try
-{
-    startServers({"0.0.0.0:3930", "0.0.0.0:3931", "0.0.0.0:3932"});
-    {
-        auto tasks = context
-                         .scan("test_db", "l_table")
-                         .join(context.scan("test_db", "r_table"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")})
-                         .buildMPPTasks(context, serverNum());
+// TEST_F(ComputeServerRunner, runJoinTasks)
+// try
+// {
+//     startServers({"0.0.0.0:3930", "0.0.0.0:3931", "0.0.0.0:3932"});
+//     {
+//         auto tasks = context
+//                          .scan("test_db", "l_table")
+//                          .join(context.scan("test_db", "r_table"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")})
+//                          .buildMPPTasks(context, serverNum());
 
-        auto expected_cols = {
-            toNullableVec<String>({{}, "banana", "banana"}),
-            toNullableVec<String>({{}, "apple", "banana"}),
-            toNullableVec<String>({{}, "banana", "banana"}),
-            toNullableVec<String>({{}, "apple", "banana"})};
+//         auto expected_cols = {
+//             toNullableVec<String>({{}, "banana", "banana"}),
+//             toNullableVec<String>({{}, "apple", "banana"}),
+//             toNullableVec<String>({{}, "banana", "banana"}),
+//             toNullableVec<String>({{}, "apple", "banana"})};
 
-        std::vector<String> expected_strings = {
-            R"(exchange_sender_5 | type:Hash, {<0, String>, <1, String>}
- table_scan_1 | {<0, String>, <1, String>})",
-            R"(exchange_sender_5 | type:Hash, {<0, String>, <1, String>}
- table_scan_1 | {<0, String>, <1, String>})",
-            R"(exchange_sender_5 | type:Hash, {<0, String>, <1, String>}
- table_scan_1 | {<0, String>, <1, String>})",
-            R"(exchange_sender_4 | type:Hash, {<0, String>, <1, String>}
- table_scan_0 | {<0, String>, <1, String>})",
-            R"(exchange_sender_4 | type:Hash, {<0, String>, <1, String>}
- table_scan_0 | {<0, String>, <1, String>})",
-            R"(exchange_sender_4 | type:Hash, {<0, String>, <1, String>}
- table_scan_0 | {<0, String>, <1, String>})",
-            R"(exchange_sender_3 | type:PassThrough, {<0, String>, <1, String>, <2, String>, <3, String>}
- Join_2 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}
-  exchange_receiver_6 | type:PassThrough, {<0, String>, <1, String>}
-  exchange_receiver_7 | type:PassThrough, {<0, String>, <1, String>})",
-            R"(exchange_sender_3 | type:PassThrough, {<0, String>, <1, String>, <2, String>, <3, String>}
- Join_2 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}
-  exchange_receiver_6 | type:PassThrough, {<0, String>, <1, String>}
-  exchange_receiver_7 | type:PassThrough, {<0, String>, <1, String>})",
-            R"(exchange_sender_3 | type:PassThrough, {<0, String>, <1, String>, <2, String>, <3, String>}
- Join_2 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}
-  exchange_receiver_6 | type:PassThrough, {<0, String>, <1, String>}
-  exchange_receiver_7 | type:PassThrough, {<0, String>, <1, String>})"};
+//         std::vector<String> expected_strings = {
+//             R"(exchange_sender_5 | type:Hash, {<0, String>, <1, String>}
+//  table_scan_1 | {<0, String>, <1, String>})",
+//             R"(exchange_sender_5 | type:Hash, {<0, String>, <1, String>}
+//  table_scan_1 | {<0, String>, <1, String>})",
+//             R"(exchange_sender_5 | type:Hash, {<0, String>, <1, String>}
+//  table_scan_1 | {<0, String>, <1, String>})",
+//             R"(exchange_sender_4 | type:Hash, {<0, String>, <1, String>}
+//  table_scan_0 | {<0, String>, <1, String>})",
+//             R"(exchange_sender_4 | type:Hash, {<0, String>, <1, String>}
+//  table_scan_0 | {<0, String>, <1, String>})",
+//             R"(exchange_sender_4 | type:Hash, {<0, String>, <1, String>}
+//  table_scan_0 | {<0, String>, <1, String>})",
+//             R"(exchange_sender_3 | type:PassThrough, {<0, String>, <1, String>, <2, String>, <3, String>}
+//  Join_2 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}
+//   exchange_receiver_6 | type:PassThrough, {<0, String>, <1, String>}
+//   exchange_receiver_7 | type:PassThrough, {<0, String>, <1, String>})",
+//             R"(exchange_sender_3 | type:PassThrough, {<0, String>, <1, String>, <2, String>, <3, String>}
+//  Join_2 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}
+//   exchange_receiver_6 | type:PassThrough, {<0, String>, <1, String>}
+//   exchange_receiver_7 | type:PassThrough, {<0, String>, <1, String>})",
+//             R"(exchange_sender_3 | type:PassThrough, {<0, String>, <1, String>, <2, String>, <3, String>}
+//  Join_2 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}
+//   exchange_receiver_6 | type:PassThrough, {<0, String>, <1, String>}
+//   exchange_receiver_7 | type:PassThrough, {<0, String>, <1, String>})"};
 
-        size_t task_size = tasks.size();
-        for (size_t i = 0; i < task_size; ++i)
-        {
-            ASSERT_DAGREQUEST_EQAUL(expected_strings[i], tasks[i].dag_request);
-        }
+//         size_t task_size = tasks.size();
+//         for (size_t i = 0; i < task_size; ++i)
+//         {
+//             ASSERT_DAGREQUEST_EQAUL(expected_strings[i], tasks[i].dag_request);
+//         }
 
-        ASSERT_MPPTASK_EQUAL_WITH_SERVER_NUM(
-            context
-                .scan("test_db", "l_table")
-                .join(context.scan("test_db", "r_table"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")}),
-            expect_cols);
-    }
-    {
-        auto tasks = context
-                         .scan("test_db", "l_table")
-                         .join(context.scan("test_db", "r_table"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")})
-                         .buildMPPTasks(context, 1);
+//         ASSERT_MPPTASK_EQUAL_WITH_SERVER_NUM(
+//             context
+//                 .scan("test_db", "l_table")
+//                 .join(context.scan("test_db", "r_table"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")}),
+//             expect_cols);
+//     }
+//     {
+//         auto tasks = context
+//                          .scan("test_db", "l_table")
+//                          .join(context.scan("test_db", "r_table"), tipb::JoinType::TypeLeftOuterJoin, {col("join_c")})
+//                          .buildMPPTasks(context, 1);
 
-        std::vector<String> expected_strings = {
-            R"(exchange_sender_5 | type:Hash, {<0, String>, <1, String>}
- table_scan_1 | {<0, String>, <1, String>})",
-            R"(exchange_sender_4 | type:Hash, {<0, String>, <1, String>}
- table_scan_0 | {<0, String>, <1, String>})",
-            R"(exchange_sender_3 | type:PassThrough, {<0, String>, <1, String>, <2, String>, <3, String>}
- Join_2 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}
-  exchange_receiver_6 | type:PassThrough, {<0, String>, <1, String>}
-  exchange_receiver_7 | type:PassThrough, {<0, String>, <1, String>})"};
+//         std::vector<String> expected_strings = {
+//             R"(exchange_sender_5 | type:Hash, {<0, String>, <1, String>}
+//  table_scan_1 | {<0, String>, <1, String>})",
+//             R"(exchange_sender_4 | type:Hash, {<0, String>, <1, String>}
+//  table_scan_0 | {<0, String>, <1, String>})",
+//             R"(exchange_sender_3 | type:PassThrough, {<0, String>, <1, String>, <2, String>, <3, String>}
+//  Join_2 | LeftOuterJoin, HashJoin. left_join_keys: {<0, String>}, right_join_keys: {<0, String>}
+//   exchange_receiver_6 | type:PassThrough, {<0, String>, <1, String>}
+//   exchange_receiver_7 | type:PassThrough, {<0, String>, <1, String>})"};
 
-        size_t task_size = tasks.size();
-        for (size_t i = 0; i < task_size; ++i)
-        {
-            ASSERT_DAGREQUEST_EQAUL(expected_strings[i], tasks[i].dag_request);
-        }
-    }
-}
-CATCH
+//         size_t task_size = tasks.size();
+//         for (size_t i = 0; i < task_size; ++i)
+//         {
+//             ASSERT_DAGREQUEST_EQAUL(expected_strings[i], tasks[i].dag_request);
+//         }
+//     }
+// }
+// CATCH
 
 } // namespace tests
 } // namespace DB

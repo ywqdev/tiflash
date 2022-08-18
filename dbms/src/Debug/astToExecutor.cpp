@@ -29,6 +29,8 @@
 #include <Poco/StringTokenizer.h>
 #include <common/logger_useful.h>
 
+#include <iostream>
+
 namespace DB
 {
 using ASTPartitionByElement = ASTOrderByElement;
@@ -827,6 +829,7 @@ bool ExchangeSender::toTiPBExecutor(tipb::Executor * tipb_executor, int32_t coll
     for (auto task_id : mpp_info.sender_target_task_ids)
     {
         mpp::TaskMeta meta;
+        std::cout << "ywq test start_ts in exchangsender toTipb: " << mpp_info.start_ts << std::endl;
         meta.set_start_ts(mpp_info.start_ts);
         meta.set_task_id(task_id);
         meta.set_partition_id(mpp_info.partition_id);
@@ -871,6 +874,7 @@ bool ExchangeReceiver::toTiPBExecutor(tipb::Executor * tipb_executor, int32_t co
     for (size_t i = 0; i < size; ++i)
     {
         mpp::TaskMeta meta;
+        std::cout << "ywq test start_ts in exchangreceiver totipb: " << mpp_info.start_ts << std::endl;
         meta.set_start_ts(mpp_info.start_ts);
         meta.set_task_id(it->second[i]);
         meta.set_partition_id(i);
@@ -884,8 +888,23 @@ bool ExchangeReceiver::toTiPBExecutor(tipb::Executor * tipb_executor, int32_t co
 
 void TableScan::columnPrune(std::unordered_set<String> & used_columns)
 {
-    output_schema.erase(std::remove_if(output_schema.begin(), output_schema.end(), [&](const auto & field) { return used_columns.count(field.first) == 0; }),
-                        output_schema.end());
+    DAGSchema new_schema;
+
+    for (const auto & col : output_schema)
+    {
+        for (const auto & used_col : used_columns)
+        {
+            if (splitQualifiedName(used_col).column_name == splitQualifiedName(col.first).column_name && splitQualifiedName(used_col).table_name == splitQualifiedName(col.first).table_name)
+            {
+                new_schema.push_back({used_col, col.second});
+            }
+        }
+    }
+
+    output_schema = new_schema;
+    std::cout << "ywq test tablescan pruned.." << std::endl;
+    for (const auto & s : output_schema)
+        std::cout << s.first << std::endl;
 }
 
 bool TableScan::toTiPBExecutor(tipb::Executor * tipb_executor, int32_t, const MPPInfo &, const Context &)
@@ -1123,6 +1142,8 @@ void Aggregation::toMPPSubPlan(size_t & executor_index, const DAGProperties & pr
 
     std::shared_ptr<ExchangeReceiver> exchange_receiver
         = std::make_shared<ExchangeReceiver>(executor_index, output_schema_for_partial_agg);
+    
+    std::cout << "ywq test exchang receiver name: " << exchange_receiver->name << std::endl;
     exchange_map[exchange_receiver->name] = std::make_pair(exchange_receiver, exchange_sender);
     /// re-construct agg_exprs and gby_exprs in final_agg
     for (size_t i = 0; i < partial_agg->agg_exprs.size(); i++)
@@ -1195,7 +1216,7 @@ void Project::columnPrune(std::unordered_set<String> & used_columns)
             collectUsedColumnsFromExpr(children[0]->output_schema, expr, used_input_columns);
         }
     }
-    std::cout << "ywq test used in project." << std::endl;
+    std::cout << "ywq test project." << std::endl;
     for (auto c : used_input_columns)
     {
         std::cout << c << std::endl;
@@ -1209,21 +1230,57 @@ void Join::columnPrune(std::unordered_set<String> & used_columns)
     std::unordered_set<String> right_columns;
 
     for (auto & field : children[0]->output_schema)
-        left_columns.emplace(field.first);
+    {
+        auto [db_name, table_name, column_name] = splitQualifiedName(field.first);
+        left_columns.emplace(table_name + "." + column_name);
+    }
+
     for (auto & field : children[1]->output_schema)
-        right_columns.emplace(field.first);
+    {
+        auto [db_name, table_name, column_name] = splitQualifiedName(field.first);
+        right_columns.emplace(table_name + "." + column_name);
+    }
 
     std::unordered_set<String> left_used_columns;
     std::unordered_set<String> right_used_columns;
 
+    std::cout << "ywq test used columns in agg...." << std::endl;
+    for (auto s : used_columns)
+    {
+        std::cout << s << std::endl;
+    }
+
+    std::cout << "ywq test left columns in join...." << std::endl;
+
+    for (auto s : left_columns)
+    {
+        std::cout << s << std::endl;
+    }
+    std::cout << "ywq test right columns in join...." << std::endl;
+
+    for (auto s : right_columns)
+    {
+        std::cout << s << std::endl;
+    }
+
     for (const auto & s : used_columns)
     {
-        if (left_columns.find(s) != left_columns.end())
-            left_used_columns.emplace(s);
+        auto [db_name, table_name, col_name] = splitQualifiedName(s);
+        auto t = table_name + "." + col_name;
+        if (left_columns.find(t) != left_columns.end()) 
+            left_used_columns.emplace(t);
 
-        if (right_columns.find(s) != right_columns.end())
-            right_used_columns.emplace(s);
+        if (right_columns.find(t) != right_columns.end())
+            right_used_columns.emplace(t);
     }
+
+    std::cout << "ywq test join left used columns before" << std::endl;
+    for (auto s : left_used_columns)
+        std::cout << s << std::endl;
+    std::cout << "ywq test join right used columns before" << std::endl;
+    for (auto s : right_used_columns)
+        std::cout << s << std::endl;
+
 
     for (const auto & child : join_cols)
     {
@@ -1232,17 +1289,19 @@ void Join::columnPrune(std::unordered_set<String> & used_columns)
             auto col_name = identifier->getColumnName();
             for (auto & field : children[0]->output_schema)
             {
-                if (col_name == splitQualifiedName(field.first).column_name)
+                auto [db_name, table_name, column_name] = splitQualifiedName(field.first);
+                if (col_name == column_name)
                 {
-                    left_used_columns.emplace(field.first);
+                    left_used_columns.emplace(table_name + "." + column_name);
                     break;
                 }
             }
             for (auto & field : children[1]->output_schema)
             {
-                if (col_name == splitQualifiedName(field.first).column_name)
+                auto [db_name, table_name, column_name] = splitQualifiedName(field.first);
+                if (col_name == column_name)
                 {
-                    right_used_columns.emplace(field.first);
+                    right_used_columns.emplace(table_name + "." + column_name);
                     break;
                 }
             }
@@ -1253,18 +1312,18 @@ void Join::columnPrune(std::unordered_set<String> & used_columns)
         }
     }
 
-    children[0]->columnPrune(left_used_columns);
-    children[1]->columnPrune(right_used_columns);
-
-    std::cout << "ywq test join left used columns" << std::endl;
+    std::cout << "ywq test join left used columns after" << std::endl;
     for (auto s : left_used_columns)
         std::cout << s << std::endl;
-    std::cout << "ywq test join right used columns" << std::endl;
+    std::cout << "ywq test join right used columns after" << std::endl;
     for (auto s : right_used_columns)
         std::cout << s << std::endl;
 
+    children[0]->columnPrune(left_used_columns);
+    children[1]->columnPrune(right_used_columns);
+
     /// update output schema
-    // output_schema.clear(); // this is a bug...
+    output_schema.clear();
 
     for (auto & field : children[0]->output_schema)
     {
@@ -1281,6 +1340,10 @@ void Join::columnPrune(std::unordered_set<String> & used_columns)
         else
             output_schema.push_back(field);
     }
+
+    std::cout << "ywq test join column pruned.." << std::endl;
+    for (auto s : output_schema)
+        std::cout << s.first << std::endl;
 }
 
 void Join::fillJoinKeyAndFieldType(
@@ -1404,11 +1467,11 @@ void Join::toMPPSubPlan(size_t & executor_index, const DAGProperties & propertie
         push_back_partition_key(right_partition_keys, children[1]->output_schema, key);
     }
 
-    std::cout << "ywq test join tompp subplan children[0] schema:" << std::endl;
+    std::cout << "ywq test join to mpp subplan children[0] schema:" << std::endl;
     for (auto s : children[0]->output_schema)
         std::cout << s.first << std::endl;
 
-    std::cout << "ywq test join tompp subplan children[1] schema:" << std::endl;
+    std::cout << "ywq test join to mpp subplan children[1] schema:" << std::endl;
     for (auto s : children[1]->output_schema)
         std::cout << s.first << std::endl;
 
@@ -1694,6 +1757,7 @@ ExecutorPtr compileProject(ExecutorPtr input, size_t & executor_index, ASTPtr se
             auto ft = std::find_if(input->output_schema.begin(), input->output_schema.end(), [&](const auto & field) { return field.first == expr->getColumnName(); });
             if (ft != input->output_schema.end())
             {
+                std::cout << "ywq test ft->first:" << ft->first << std::endl;
                 output_schema.emplace_back(ft->first, ft->second);
                 continue;
             }

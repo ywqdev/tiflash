@@ -19,6 +19,8 @@
 #include <TestUtils/executorSerializer.h>
 #include <tipb/executor.pb.h>
 #include <tipb/expression.pb.h>
+#include <kvproto/mpp.pb.h>
+#include <cstddef>
 namespace DB::tests
 {
 namespace
@@ -194,6 +196,13 @@ void serializeExchangeSender(const String & executor_id, const tipb::ExchangeSen
 {
     buf.fmtAppend("{} | type:{}, {{", executor_id, getExchangeTypeName(sender.tp()));
     toString(sender.all_field_types(), buf);
+    std::cout << "ywq test sender task meta..." << std::endl;
+    for (int i = 0; i < sender.encoded_task_meta_size(); ++i)
+    {
+        mpp::TaskMeta meta;
+        meta.ParseFromString(sender.encoded_task_meta(i));
+        meta.PrintDebugString();
+    }
     buf.append("}\n");
 }
 
@@ -201,6 +210,13 @@ void serializeExchangeReceiver(const String & executor_id, const tipb::ExchangeR
 {
     buf.fmtAppend("{} | type:{}, {{", executor_id, getExchangeTypeName(receiver.tp()));
     toString(receiver.field_types(), buf);
+    std::cout << "ywq test receiver task meta..." << std::endl;
+    for (int i = 0; i < receiver.encoded_task_meta_size(); ++i)
+    {
+        mpp::TaskMeta meta;
+        meta.ParseFromString(receiver.encoded_task_meta(i));
+        meta.PrintDebugString();
+    }
     buf.append("}\n");
 }
 

@@ -189,6 +189,7 @@ BlockInputStreamPtr prepareRootExchangeReceiver(Context & context, const DAGProp
     tipb::ExchangeReceiver tipb_exchange_receiver;
     for (const auto root_task_id : root_task_ids)
     {
+        std::cout << "ywq test root task id: " << root_task_id << std::endl;
         mpp::TaskMeta tm;
         tm.set_start_ts(properties.start_ts);
         tm.set_address(Debug::LOCAL_HOST);
@@ -310,6 +311,7 @@ BlockInputStreamPtr executeMPPQuery(Context & context, const DAGProperties & pro
 // execute MPP Query across multiple service
 BlockInputStreamPtr executeMPPQuery(Context & context, const DAGProperties & properties, QueryTasks & query_tasks, std::unordered_map<size_t, tests::MockServerConfig> & server_config_map)
 {
+    std::cout << "ywq test call mpp query...." << std::endl;
     DAGSchema root_task_schema;
     std::vector<Int64> root_task_ids;
     for (auto & task : query_tasks)
@@ -574,9 +576,9 @@ struct QueryFragment
         auto * root_tipb_executor = dag_request.mutable_root_executor();
         root_executor->toTiPBExecutor(root_tipb_executor, properties.collator, mpp_info, context);
         std::cout << "ywq test to query task schema: " << std::endl;
-        for (auto s: root_executor->output_schema)
+        for (auto s : root_executor->output_schema)
         {
-            std::cout <<s.first << std::endl;
+            std::cout << s.first << std::endl;
         }
         return QueryTask(dag_request_ptr, table_id, root_executor->output_schema, mpp_info.sender_target_task_ids.empty() ? DAG : MPP_DISPATCH, mpp_info.task_id, mpp_info.partition_id, is_top_fragment);
     }
@@ -584,10 +586,17 @@ struct QueryFragment
     QueryTasks toQueryTasks(const DAGProperties & properties, const Context & context) const
     {
         QueryTasks ret;
+        std::cout << "ywq test task ids: ";
+        for (auto id : task_ids)
+        {
+            std::cout << id << " ";
+        }
+        std::cout << std::endl;
         if (properties.is_mpp_query)
         {
             for (size_t partition_id = 0; partition_id < task_ids.size(); partition_id++)
             {
+                std::cout << "ywq test start ts: " << properties.start_ts << ", partition_id: " << partition_id << std::endl;
                 MPPInfo mpp_info(
                     properties.start_ts,
                     partition_id,
@@ -650,6 +659,8 @@ QueryFragments mppQueryToQueryFragments(
     QueryFragments fragments;
     std::unordered_map<String, std::pair<std::shared_ptr<mock::ExchangeReceiver>, std::shared_ptr<mock::ExchangeSender>>> exchange_map;
     root_executor->toMPPSubPlan(executor_index, properties, exchange_map);
+
+    std::cout << "ywq test current exeuctor_name: " << root_executor->name << std::endl;
     TableID table_id = findTableIdForQueryFragment(root_executor, exchange_map.empty());
     std::vector<Int64> sender_target_task_ids = mpp_ctx->sender_target_task_ids;
     std::unordered_map<String, std::vector<Int64>> receiver_source_task_ids_map;
@@ -665,11 +676,24 @@ QueryFragments mppQueryToQueryFragments(
     std::vector<Int64> current_task_ids;
     for (size_t i = 0; i < current_task_num; i++)
         current_task_ids.push_back(mpp_ctx->next_task_id++);
+
+    std::cout << "ywq test current task ids: " << std::endl;
+    for (auto id : current_task_ids)
+    {
+        std::cout << id << " ";
+    }
+    std::cout << std::endl;
     for (auto & exchange : exchange_map)
     {
         mpp_ctx->sender_target_task_ids = current_task_ids;
+        std::cout << "ywq test sender name: " << exchange.second.second->name << std::endl;
         auto sub_fragments = mppQueryToQueryFragments(exchange.second.second, executor_index, properties, false, mpp_ctx);
-        receiver_source_task_ids_map[exchange.first] = sub_fragments.cbegin()->task_ids;
+        std::cout << "ywq test set receiver_source_task_ids_map, receiver name: " << exchange.first << ", subfragments size: " << sub_fragments.size() << std::endl;
+        std::cout << "task ids: ";
+        for (auto id : sub_fragments[sub_fragments.size() - 1].task_ids)
+            std::cout << id << " " << std::endl;
+        std::cout << "ywq test wtf sender name: " << sub_fragments[sub_fragments.size() - 1].root_executor->name << std::endl;
+        receiver_source_task_ids_map[exchange.first] = sub_fragments[sub_fragments.size() - 1].task_ids; // ywq todo maybe fixed one bug,
         fragments.insert(fragments.end(), sub_fragments.begin(), sub_fragments.end());
     }
     fragments.emplace_back(root_executor, table_id, for_root_fragment, std::move(sender_target_task_ids), std::move(receiver_source_task_ids_map), std::move(current_task_ids));
@@ -684,6 +708,7 @@ QueryFragments queryPlanToQueryFragments(const DAGProperties & properties, Execu
             = std::make_shared<mock::ExchangeSender>(executor_index, root_executor->output_schema, tipb::PassThrough);
         root_exchange_sender->children.push_back(root_executor);
         root_executor = root_exchange_sender;
+        std::cout << "ywq test start_ts1: " << properties.start_ts << std::endl;
         MPPCtxPtr mpp_ctx = std::make_shared<MPPCtx>(properties.start_ts);
         mpp_ctx->sender_target_task_ids.emplace_back(-1);
         return mppQueryToQueryFragments(root_executor, executor_index, properties, true, mpp_ctx);
@@ -703,6 +728,17 @@ QueryTasks queryPlanToQueryTasks(
     const Context & context)
 {
     QueryFragments fragments = queryPlanToQueryFragments(properties, root_executor, executor_index);
+
+    int idx = 0;
+    for (auto fra : fragments)
+    {
+        std::cout << "ywq test fragemnt " << idx++ << ", sender target task ids: ";
+        for (auto id : fra.sender_target_task_ids)
+        {
+            std::cout << id << " ";
+        }
+        std::cout << std::endl;
+    }
     QueryTasks tasks;
     for (auto & fragment : fragments)
     {

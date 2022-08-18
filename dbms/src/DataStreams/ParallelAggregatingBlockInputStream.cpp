@@ -197,7 +197,7 @@ void ParallelAggregatingBlockInputStream::Handler::onException(std::exception_pt
 
     if (!parent.executed)
         /// use cancel instead of kill to avoid too many useless error message
-        parent.processor.cancel(true);
+        parent.processor.cancel(false);
 }
 
 
