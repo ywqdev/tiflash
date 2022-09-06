@@ -314,9 +314,11 @@ try
     }
 
     std::vector<ColumnsWithTypeAndName> expect_colss{
-        {toVec<UInt64>("count(1)", ColumnWithUInt64{3})}};
+        {toVec<UInt64>("count(1)", ColumnWithUInt64{1})}};
     request = context
                   .scan("aggnull_test", "t1")
+                  .aggregation({Count(lit(Field(static_cast<UInt64>(1))))}, {})
+                  .aggregation({Count(lit(Field(static_cast<UInt64>(1))))}, {})
                   .aggregation({Count(lit(Field(static_cast<UInt64>(1))))}, {})
                   .build(context);
 
