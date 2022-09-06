@@ -312,6 +312,15 @@ try
         request = buildDAGRequest(std::make_pair(db_name, table_name), {agg_funcs[i]}, group_by_exprs[i], projections[i]);
         executeWithConcurrency(request, expect_cols[i]);
     }
+
+    std::vector<ColumnsWithTypeAndName> expect_colss{
+        {toVec<UInt64>("count(1)", ColumnWithUInt64{3})}};
+    request = context
+                  .scan("aggnull_test", "t1")
+                  .aggregation({Count(lit(Field(static_cast<UInt64>(1))))}, {})
+                  .build(context);
+
+    ASSERT_COLUMNS_EQ_UR(expect_colss[0], executeStreams(request, 1));
 }
 CATCH
 

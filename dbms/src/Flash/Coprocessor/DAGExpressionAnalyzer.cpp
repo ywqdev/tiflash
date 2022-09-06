@@ -37,6 +37,8 @@
 #include <Parsers/ASTIdentifier.h>
 #include <Storages/Transaction/TypeMapping.h>
 #include <WindowFunctions/WindowFunctionFactory.h>
+
+#include "common/types.h"
 namespace DB
 {
 namespace ErrorCodes
@@ -332,8 +334,13 @@ void DAGExpressionAnalyzer::buildCommonAggFunc(
     Names arg_names;
     DataTypes arg_types;
     TiDB::TiDBCollators arg_collators;
+
     for (Int32 i = 0; i < child_size; ++i)
     {
+        if (child_size == 1 && agg_func_name == "count" && isLiteralExpr(expr.children(0)))
+        {
+            break;
+        }
         fillArgumentDetail(actions, expr.children(i), arg_names, arg_types, arg_collators);
     }
 
