@@ -127,7 +127,7 @@ void MPPTask::registerTunnels(const mpp::DispatchTaskRequest & task_request)
         bool is_async = !is_local && context->getSettingsRef().enable_async_server;
         MPPTunnelPtr tunnel = std::make_shared<MPPTunnel>(task_meta, task_request.meta(), timeout, context->getSettingsRef().max_threads, is_local, is_async, log->identifier());
         LOG_FMT_DEBUG(log, "begin to register the tunnel {}, is_local: {}, is_async: {}", tunnel->id(), is_local, is_async);
-        if (status != INITIALIZING)
+        if (status != TaskStatus::INITIALIZING)
             throw Exception(fmt::format("The tunnel {} can not be registered, because the task is not in initializing state", tunnel->id()));
         tunnel_set_local->registerTunnel(MPPTaskId{task_meta.start_ts(), task_meta.task_id()}, tunnel);
         if (!dag_context->isRootMPPTask())
@@ -137,7 +137,7 @@ void MPPTask::registerTunnels(const mpp::DispatchTaskRequest & task_request)
     }
     {
         std::unique_lock lock(tunnel_and_receiver_mu);
-        if (status != INITIALIZING)
+        if (status != TaskStatus::INITIALIZING)
             throw Exception(fmt::format("The tunnels can not be registered, because the task is not in initializing state"));
         tunnel_set = std::move(tunnel_set_local);
     }
@@ -166,7 +166,7 @@ void MPPTask::initExchangeReceivers()
                 log->identifier(),
                 executor_id,
                 executor.fine_grained_shuffle_stream_count());
-            if (status != RUNNING)
+            if (status != TaskStatus::RUNNING)
                 throw Exception("exchange receiver map can not be initialized, because the task is not in running state");
 
             receiver_set_local->addExchangeReceiver(executor_id, exchange_receiver);
@@ -176,7 +176,7 @@ void MPPTask::initExchangeReceivers()
     });
     {
         std::unique_lock lock(tunnel_and_receiver_mu);
-        if (status != RUNNING)
+        if (status != TaskStatus::RUNNING)
             throw Exception("exchange receiver map can not be initialized, because the task is not in running state");
         receiver_set = std::move(receiver_set_local);
     }
@@ -185,7 +185,7 @@ void MPPTask::initExchangeReceivers()
 
 std::pair<MPPTunnelPtr, String> MPPTask::getTunnel(const ::mpp::EstablishMPPConnectionRequest * request)
 {
-    if (status == CANCELLED || status == FAILED)
+    if (status == TaskStatus::CANCELLED || status == TaskStatus::FAILED)
     {
         auto err_msg = fmt::format(
             "can't find tunnel ({} + {}) because the task is aborted, error message = {}",
@@ -318,7 +318,7 @@ void MPPTask::preprocess()
     executeQuery(*context);
     {
         std::unique_lock lock(tunnel_and_receiver_mu);
-        if (status != RUNNING)
+        if (status != TaskStatus::RUNNING)
             throw Exception("task not in running state, may be cancelled");
         for (auto & r : dag_context->getCoprocessorReaders())
             receiver_set->addCoprocessorReader(r);
@@ -333,7 +333,7 @@ void MPPTask::runImpl()
 {
     CPUAffinityManager::getInstance().bindSelfQueryThread();
     RUNTIME_ASSERT(current_memory_tracker == process_list_entry->get().getMemoryTrackerPtr().get(), log, "The current memory tracker is not set correctly for MPPTask::runImpl");
-    if (!switchStatus(INITIALIZING, RUNNING))
+    if (!switchStatus(TaskStatus::INITIALIZING, TaskStatus::RUNNING))
     {
         LOG_WARNING(log, "task not in initializing state, skip running");
         unregisterTask();
@@ -357,7 +357,7 @@ void MPPTask::runImpl()
         scheduleOrWait();
 
         LOG_FMT_INFO(log, "task starts running");
-        if (status.load() != RUNNING)
+        if (status.load() != TaskStatus::RUNNING)
         {
             /// when task is in running state, canceling the task will call sendCancelToQuery to do the cancellation, however
             /// if the task is cancelled during preprocess, sendCancelToQuery may just be ignored because the processlist of
@@ -394,11 +394,11 @@ void MPPTask::runImpl()
 
     if (err_msg.empty())
     {
-        if (switchStatus(RUNNING, FINISHED))
+        if (switchStatus(TaskStatus::RUNNING, TaskStatus::FINISHED))
             LOG_INFO(log, "finish task");
         else
             LOG_WARNING(log, "finish task which is in {} state", magic_enum::enum_name(status.load()));
-        if (status == FINISHED)
+        if (status == TaskStatus::FINISHED)
         {
             // todo when error happens, should try to update the metrics if it is available
             if (auto throughput = dag_context->getTableScanThroughput(); throughput.first)
@@ -411,7 +411,7 @@ void MPPTask::runImpl()
     }
     else
     {
-        if (status == RUNNING)
+        if (status == TaskStatus::RUNNING)
         {
             LOG_FMT_ERROR(log, "task running meets error: {}", err_msg);
             /// trim the stack trace to avoid too many useless information in log
@@ -449,22 +449,22 @@ void MPPTask::abort(const String & message, AbortType abort_type)
     switch (abort_type)
     {
     case AbortType::ONCANCELLATION:
-        next_task_status = CANCELLED;
+        next_task_status = TaskStatus::CANCELLED;
         break;
     case AbortType::ONERROR:
-        next_task_status = FAILED;
+        next_task_status = TaskStatus::FAILED;
         break;
     }
     LOG_WARNING(log, "Begin abort task: {}, abort type: {}", id.toString(), abort_type_string);
     while (true)
     {
         auto previous_status = status.load();
-        if (previous_status == FINISHED || previous_status == CANCELLED || previous_status == FAILED)
+        if (previous_status == TaskStatus::FINISHED || previous_status == TaskStatus::CANCELLED || previous_status == TaskStatus::FAILED)
         {
             LOG_WARNING(log, "task already in {} state", magic_enum::enum_name(previous_status));
             return;
         }
-        else if (previous_status == INITIALIZING && switchStatus(INITIALIZING, next_task_status))
+        else if (previous_status == TaskStatus::INITIALIZING && switchStatus(TaskStatus::INITIALIZING, next_task_status))
         {
             err_string = message;
             /// if the task is in initializing state, mpp task can return error to TiDB directly,
@@ -473,7 +473,7 @@ void MPPTask::abort(const String & message, AbortType abort_type)
             LOG_WARNING(log, "Finish abort task from uninitialized");
             return;
         }
-        else if (previous_status == RUNNING && switchStatus(RUNNING, next_task_status))
+        else if (previous_status == TaskStatus::RUNNING && switchStatus(TaskStatus::RUNNING, next_task_status))
         {
             /// abort the components from top to bottom because if bottom components are aborted
             /// first, the top components may see an error caused by the abort, which is not

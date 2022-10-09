@@ -30,13 +30,13 @@ MPPTaskStatistics::MPPTaskStatistics(const MPPTaskId & id_, String address_)
     , id(id_)
     , host(std::move(address_))
     , task_init_timestamp(Clock::now())
-    , status(INITIALIZING)
+    , status(TaskStatus::INITIALIZING)
 {}
 
 void MPPTaskStatistics::start()
 {
     task_start_timestamp = Clock::now();
-    status = RUNNING;
+    status = TaskStatus::RUNNING;
 }
 
 void MPPTaskStatistics::end(const TaskStatus & status_, StringRef error_message_)

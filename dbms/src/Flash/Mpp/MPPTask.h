@@ -127,7 +127,7 @@ private:
 
     std::shared_ptr<ProcessListEntry> process_list_entry;
 
-    std::atomic<TaskStatus> status{INITIALIZING};
+    std::atomic<TaskStatus> status{TaskStatus::INITIALIZING};
     String err_string;
 
     std::mutex tunnel_and_receiver_mu;

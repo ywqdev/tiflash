@@ -14,11 +14,9 @@
 
 #pragma once
 
-#include <common/StringRef.h>
-
 namespace DB
 {
-enum TaskStatus
+enum class TaskStatus
 {
     INITIALIZING,
     RUNNING,
