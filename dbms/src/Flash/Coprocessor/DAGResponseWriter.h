@@ -50,6 +50,7 @@ public:
         bool delta_mode);
     void addExecuteSummaries(tipb::SelectResponse & response, bool delta_mode);
     virtual void write(const Block & block) = 0;
+    void preWrite(const Block & block);
     virtual void finishWrite() = 0;
     virtual ~DAGResponseWriter() = default;
     const DAGContext & dagContext() const { return dag_context; }
@@ -57,6 +58,9 @@ public:
 protected:
     Int64 records_per_chunk;
     DAGContext & dag_context;
+    std::vector<Block> blocks;
+    size_t rows_in_blocks;
+
     std::unordered_map<String, ExecutionSummary> previous_execution_stats;
     std::unordered_set<String> local_executors;
 };

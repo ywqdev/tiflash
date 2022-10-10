@@ -15,7 +15,7 @@
 #include <Common/TiFlashException.h>
 #include <Flash/Coprocessor/CHBlockChunkCodec.h>
 #include <Flash/Mpp/HashBaseWriterHelper.h>
-#include <Flash/Mpp/HashParitionWriter.h>
+#include <Flash/Mpp/HashPartitionWriter.h>
 #include <Flash/Mpp/MPPTunnelSet.h>
 
 namespace DB
@@ -58,15 +58,7 @@ void HashPartitionWriter<StreamWriterPtr>::finishWrite()
 template <class StreamWriterPtr>
 void HashPartitionWriter<StreamWriterPtr>::write(const Block & block)
 {
-    RUNTIME_CHECK_MSG(
-        block.columns() == dag_context.result_field_types.size(),
-        "Output column size mismatch with field type size");
-    size_t rows = block.rows();
-    rows_in_blocks += rows;
-    if (rows > 0)
-    {
-        blocks.push_back(block);
-    }
+    preWrite(block);
 
     if (static_cast<Int64>(rows_in_blocks) > batch_send_min_limit)
         partitionAndEncodeThenWriteBlocks<false>();

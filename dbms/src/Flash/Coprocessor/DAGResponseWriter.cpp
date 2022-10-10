@@ -183,6 +183,19 @@ void DAGResponseWriter::addExecuteSummaries(tipb::SelectResponse & response, boo
     }
 }
 
+void DAGResponseWriter::preWrite(const Block & block)
+{
+    RUNTIME_CHECK_MSG(
+        block.columns() == dag_context.result_field_types.size(),
+        "Output column size mismatch with field type size");
+    size_t rows = block.rows();
+    rows_in_blocks += rows;
+    if (rows > 0)
+    {
+        blocks.push_back(block);
+    }
+}
+
 DAGResponseWriter::DAGResponseWriter(
     Int64 records_per_chunk_,
     DAGContext & dag_context_)

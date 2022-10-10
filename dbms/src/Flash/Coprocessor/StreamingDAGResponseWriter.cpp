@@ -80,15 +80,7 @@ void StreamingDAGResponseWriter<StreamWriterPtr>::finishWrite()
 template <class StreamWriterPtr>
 void StreamingDAGResponseWriter<StreamWriterPtr>::write(const Block & block)
 {
-    RUNTIME_CHECK_MSG(
-        block.columns() == dag_context.result_field_types.size(),
-        "Output column size mismatch with field type size");
-    size_t rows = block.rows();
-    rows_in_blocks += rows;
-    if (rows > 0)
-    {
-        blocks.push_back(block);
-    }
+    preWrite(block);
 
     if (static_cast<Int64>(rows_in_blocks) > batch_send_min_limit)
         encodeThenWriteBlocks<false>();
