@@ -68,7 +68,7 @@ public:
         read_prefixed = true;
         /// Start reading thread.
         thread_manager = newIOThreadManager();
-        for (int i = 0; i < concurrency; ++i)
+        // for (int i = 0; i < concurrency; ++i)
             thread_manager->schedule(true, "IOAdaptor", [this] { fetchBlocks(); });
     }
 
@@ -179,7 +179,7 @@ private:
     bool read_suffixed = false;
 
     FiberTraits::Mutex mutex;
-    int concurrency;
+    int concurrency[[maybe_unused]];
     std::shared_ptr<ThreadManager> thread_manager;
 
     String exception_msg;

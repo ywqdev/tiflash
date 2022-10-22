@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Common/FailPoint.h>
+#include <Common/FiberPool.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 #include <Storages/DeltaMerge/ReadThread/SegmentReadTaskScheduler.h>
 #include <Storages/DeltaMerge/SegmentReadTaskPool.h>
@@ -72,6 +73,38 @@ protected:
         return readImpl(filter_ignored, false);
     }
 
+    bool canRead()
+    {
+        if (io_block)
+        {
+            return true;
+        }
+
+        while (true)
+        {
+            Block res;
+            if (!task_pool->tryPopBlock(res))
+            {
+                return false;
+            }
+            if (res)
+            {
+                if (res.rows() == 0)
+                    continue;
+                else
+                {
+                    io_block = std::move(res);
+                }
+            }
+            else
+            {
+                done = true;
+            }
+
+            return true;
+        }
+    }
+
     // Currently, res_filter and return_filter is unused.
     Block readImpl(FilterPtr & /*res_filter*/, bool /*return_filter*/) override
     {
@@ -83,13 +116,19 @@ protected:
         while (true)
         {
             FAIL_POINT_PAUSE(FailPoints::pause_when_reading_from_dt_stream);
+
+            while (!canRead())
+            {
+                adaptive_yield();
+            }
             Block res;
-            task_pool->popBlock(res);
-            if (res)
+            std::swap(res, io_block);
+
+            if (!done)
             {
                 if (extra_table_id_index != InvalidColumnID)
                 {
-                    auto & extra_table_id_col_define = getExtraTableIDColumnDefine();
+                    const auto & extra_table_id_col_define = getExtraTableIDColumnDefine();
                     ColumnWithTypeAndName col{{}, extra_table_id_col_define.type, extra_table_id_col_define.name, extra_table_id_col_define.id};
                     size_t row_number = res.rows();
                     auto col_data = col.type->createColumnConst(row_number, Field(physical_table_id));
@@ -108,7 +147,6 @@ protected:
             }
             else
             {
-                done = true;
                 return {};
             }
         }
@@ -138,6 +176,7 @@ private:
     TableID physical_table_id;
     LoggerPtr log;
     int64_t ref_no;
+    Block io_block;
     size_t total_rows = 0;
     bool task_pool_added;
 };

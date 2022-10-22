@@ -219,6 +219,22 @@ public:
     bool readOneBlock(BlockInputStreamPtr & stream, const SegmentPtr & seg);
     void popBlock(Block & block);
 
+    bool tryPopBlock(Block & block)
+    {
+        if (q.tryPop(block))
+        {
+            blk_stat.pop(block);
+            global_blk_stat.pop(block);
+            if (exceptionHappened())
+                throw exception;
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
+
     std::unordered_map<uint64_t, std::vector<uint64_t>>::const_iterator scheduleSegment(
         const std::unordered_map<uint64_t, std::vector<uint64_t>> & segments,
         uint64_t expected_merge_count);
