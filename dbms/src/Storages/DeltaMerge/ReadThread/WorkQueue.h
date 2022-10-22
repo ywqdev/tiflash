@@ -14,7 +14,7 @@
 #pragma once
 
 #include <stdint.h>
-#include <Common/FiberTraits.h>
+
 #include <condition_variable>
 #include <mutex>
 #include <queue>
@@ -25,10 +25,10 @@ template <typename T>
 class WorkQueue
 {
     // Protects all member variable access
-    FiberTraits::Mutex mu{};
-    FiberTraits::ConditionVariable reader_cv{};
-    FiberTraits::ConditionVariable writer_cv{};
-    FiberTraits::ConditionVariable finish_cv{};
+    std::mutex mu;
+    std::condition_variable reader_cv;
+    std::condition_variable writer_cv;
+    std::condition_variable finish_cv;
     std::queue<T> queue;
     bool done;
     std::size_t max_size;
@@ -122,6 +122,7 @@ public:
         writer_cv.notify_one();
         return true;
     }
+
     /**
    * Sets the maximum queue size.  If `maxSize == 0` then it is unbounded.
    *
