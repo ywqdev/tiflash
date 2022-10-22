@@ -69,7 +69,7 @@ public:
         /// Start reading thread.
         thread_manager = newIOThreadManager();
         // for (int i = 0; i < concurrency; ++i)
-            thread_manager->schedule(true, "IOAdaptor", [this] { fetchBlocks(); });
+        thread_manager->schedule(true, "IOAdaptor", [this] { fetchBlocks(); });
     }
 
     void readSuffix() override
@@ -179,7 +179,7 @@ private:
     bool read_suffixed = false;
 
     FiberTraits::Mutex mutex;
-    int concurrency[[maybe_unused]];
+    int concurrency [[maybe_unused]];
     std::shared_ptr<ThreadManager> thread_manager;
 
     String exception_msg;

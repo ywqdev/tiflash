@@ -361,7 +361,7 @@ void DAGStorageInterpreter::executeImpl(DAGPipeline & pipeline)
         //  it only needs to hold the lock of table a
         for (const auto & lock : drop_locks)
             stream->addTableLock(lock);
-        // stream = std::make_shared<IoAdaptorBlockInputStream>(20, stream, log->identifier());
+        stream = std::make_shared<IoAdaptorBlockInputStream>(40, stream, log->identifier());
     });
 
     /// Set the limits and quota for reading data, the speed and time of the query.
@@ -549,7 +549,7 @@ void DAGStorageInterpreter::buildRemoteStreams(const std::vector<RemoteRequest> 
         auto coprocessor_reader = std::make_shared<CoprocessorReader>(schema, cluster, tasks, has_enforce_encode_type, 1);
         context.getDAGContext()->addCoprocessorReader(coprocessor_reader);
         BlockInputStreamPtr input = std::make_shared<CoprocessorBlockInputStream>(coprocessor_reader, log->identifier(), table_scan.getTableScanExecutorID(), /*stream_id=*/0);
-        input = std::make_shared<IoAdaptorBlockInputStream>(20, input, log->identifier());
+        input = std::make_shared<IoAdaptorBlockInputStream>(40, input, log->identifier());
         pipeline.streams.push_back(input);
         task_start = task_end;
     }
