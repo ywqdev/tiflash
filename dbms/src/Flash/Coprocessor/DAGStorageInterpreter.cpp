@@ -361,7 +361,7 @@ void DAGStorageInterpreter::executeImpl(DAGPipeline & pipeline)
         //  it only needs to hold the lock of table a
         for (const auto & lock : drop_locks)
             stream->addTableLock(lock);
-        stream = std::make_shared<IoAdaptorBlockInputStream>(5, stream, log->identifier());
+        // stream = std::make_shared<IoAdaptorBlockInputStream>(5, stream, log->identifier());
     });
 
     /// Set the limits and quota for reading data, the speed and time of the query.

@@ -14,7 +14,7 @@
 #pragma once
 
 #include <stdint.h>
-
+#include <Common/FiberTraits.h>
 #include <condition_variable>
 #include <mutex>
 #include <queue>
@@ -25,10 +25,10 @@ template <typename T>
 class WorkQueue
 {
     // Protects all member variable access
-    std::mutex mu;
-    std::condition_variable reader_cv;
-    std::condition_variable writer_cv;
-    std::condition_variable finish_cv;
+    FiberTraits::Mutex mu{};
+    FiberTraits::ConditionVariable reader_cv{};
+    FiberTraits::ConditionVariable writer_cv{};
+    FiberTraits::ConditionVariable finish_cv{};
     std::queue<T> queue;
     bool done;
     std::size_t max_size;
@@ -73,7 +73,7 @@ public:
     bool push(U && item, size_t * size)
     {
         {
-            std::unique_lock<std::mutex> lock(mu);
+            std::unique_lock lock(mu);
             while (full() && !done)
             {
                 writer_cv.wait(lock);
@@ -104,7 +104,7 @@ public:
     bool pop(T & item)
     {
         {
-            std::unique_lock<std::mutex> lock(mu);
+            std::unique_lock lock(mu);
             pop_times++;
             while (queue.empty() && !done)
             {
@@ -153,7 +153,7 @@ public:
     /// Blocks until `finish()` has been called (but the queue may not be empty).
     void waitUntilFinished()
     {
-        std::unique_lock<std::mutex> lock(mu);
+        std::unique_lock lock(mu);
         while (!done)
         {
             finish_cv.wait(lock);

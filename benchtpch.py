@@ -5,10 +5,10 @@ import time
 import random
 import datetime
 
-target_addr = "127.0.0.1"
+target_addr = "172.16.4.99"
 target_user = "root"
-target_database = "test"
-target_port = 4000
+target_database = "tpch_100"
+target_port = 6003
 q1 = """
 select l_returnflag, l_linestatus, sum(l_quantity) as sum_qty, sum(l_extendedprice) as sum_base_price,sum(l_extendedprice * (1 - l_discount)) as sum_disc_price, sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) as sum_charge, avg(l_quantity) as avg_qty, avg(l_extendedprice) as avg_price, avg(l_discount) as avg_disc, count(*) as count_order from lineitem
 where l_shipdate <= date '1998-12-01' - interval '108' day
@@ -392,10 +392,15 @@ class Sql:
         return info
 
 
+# sqls = {
+#     1: Sql(q1, "Q1"), 2: Sql(q2, "Q2"), 3: Sql(q3, "Q3"), 4: Sql(q4, "Q4"), 5: Sql(q5, "Q5"), 6: Sql(q6, "Q6"), 7: Sql(q7, "Q7"),
+#     8: Sql(q8, "Q8"), 9: Sql(q9, "Q9"), 10: Sql(q10, "Q10"), 11: Sql(q11, "Q11"), 12: Sql(q12, "Q12"), 13: Sql(q13, "Q13"), 14: Sql(q14, "Q14"),
+#     15: Sql(q15, "Q15"), 16: Sql(q16, "Q16"), 17: Sql(q17, "Q17"), 18: Sql(q18, "Q18"), 19: Sql(q19, "Q19"), 20: Sql(q20, "Q20"), 21: Sql(q21, "Q21"), 22: Sql(q22, "Q22")}
+
 sqls = {
-    1: Sql(q1, "Q1"), 2: Sql(q2, "Q2"), 3: Sql(q3, "Q3"), 4: Sql(q4, "Q4"), 5: Sql(q5, "Q5"), 6: Sql(q6, "Q6"), 7: Sql(q7, "Q7"),
-    8: Sql(q8, "Q8"), 9: Sql(q9, "Q9"), 10: Sql(q10, "Q10"), 11: Sql(q11, "Q11"), 12: Sql(q12, "Q12"), 13: Sql(q13, "Q13"), 14: Sql(q14, "Q14"),
-    15: Sql(q15, "Q15"), 16: Sql(q16, "Q16"), 17: Sql(q17, "Q17"), 18: Sql(q18, "Q18"), 19: Sql(q19, "Q19"), 20: Sql(q20, "Q20"), 21: Sql(q21, "Q21"), 22: Sql(q22, "Q22")}
+    1: Sql(q1, "Q1"), 2: Sql(q2, "Q2"), 3: Sql(q3, "Q3"), 4: Sql(q4, "Q4"), 5: Sql(q6, "Q6"), 6: Sql(q7, "Q7"),
+    7: Sql(q8, "Q8"), 8: Sql(q9, "Q9"), 9: Sql(q10, "Q10"), 10: Sql(q11, "Q11"), 11: Sql(q12, "Q12"), 12: Sql(q13, "Q13"), 13: Sql(q14, "Q14"),
+    14: Sql(q15, "Q15"), 15: Sql(q16, "Q16"), 16: Sql(q19, "Q19"), 17: Sql(q20, "Q20"), 18: Sql(q21, "Q21"), 19: Sql(q22, "Q22")}
 
 lock = threading.Lock()
 test_time = 1
@@ -415,17 +420,17 @@ def runClient():
                     # cursor.execute(
                     #     "SET GLOBAL tidb_multi_statement_mode='ON';")
                     isFirst = True
-                for i in range(1, 22):
+                for i in range(1, 19):
                     sql = sqls[i].getSql()
                     print("Sql: ", sqls[i].getSqlName())
-                    if i == 15:
-                        cursor.execute("create view revenue0 (supplier_no, total_revenue) as select l_suppkey, sum(l_extendedprice * (1 - l_discount)) from lineitem where l_shipdate >= date '1997-07-01'	and l_shipdate < date '1997-07-01' + interval '3' month group by l_suppkey;")
+                    # if i == 15:
+                        # cursor.execute("create view revenue0 (supplier_no, total_revenue) as select l_suppkey, sum(l_extendedprice * (1 - l_discount)) from lineitem where l_shipdate >= date '1997-07-01'	and l_shipdate < date '1997-07-01' + interval '3' month group by l_suppkey;")
                     start = time.time()
                     cursor.execute(sql)
                     end = time.time()
                     sqls[i].addInfo(end - start)
-                    if i == 15:
-                        cursor.execute("drop view revenue0;")
+                    # if i == 15:
+                        # cursor.execute("drop view revenue0;")
                     
                     print("execution time: ", end - start)
 
