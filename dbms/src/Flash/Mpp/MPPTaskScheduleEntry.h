@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include <Common/FiberTraits.h>
 #include <Common/Logger.h>
 #include <Flash/Mpp/MPPTaskId.h>
 
@@ -51,8 +52,8 @@ private:
 
     int needed_threads;
 
-    std::mutex schedule_mu;
-    std::condition_variable schedule_cv;
+    FiberTraits::Mutex schedule_mu;
+    FiberTraits::ConditionVariable schedule_cv;
     ScheduleState schedule_state;
     const LoggerPtr log;
 };

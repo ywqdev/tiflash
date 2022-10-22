@@ -61,13 +61,13 @@ class MPPTaskManager : private boost::noncopyable
 {
     MPPTaskSchedulerPtr scheduler;
 
-    std::mutex mu;
+    FiberTraits::Mutex mu;
 
     MPPQueryMap mpp_query_map;
 
     LoggerPtr log;
 
-    std::condition_variable cv;
+    FiberTraits::ConditionVariable cv;
 
 public:
     explicit MPPTaskManager(MPPTaskSchedulerPtr scheduler);

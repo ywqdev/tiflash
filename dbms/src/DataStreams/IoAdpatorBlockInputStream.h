@@ -14,31 +14,26 @@
 
 #pragma once
 
-#include <Common/FailPoint.h>
 #include <Common/MPMCQueue.h>
 #include <Common/ThreadFactory.h>
 #include <Common/ThreadManager.h>
 #include <Common/typeid_cast.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 
+#include <cstddef>
 #include <thread>
 
 namespace DB
 {
-namespace FailPoints
-{
-extern const char random_sharedquery_failpoint[];
-} // namespace FailPoints
-
-/** This block input stream is used by SharedQuery.
+/** This block input stream is used by IOAdaptor.
   * It enable multiple threads read from one stream.
  */
-class SharedQueryBlockInputStream : public IProfilingBlockInputStream
+class IoAdaptorBlockInputStream : public IProfilingBlockInputStream
 {
-    static constexpr auto NAME = "SharedQuery";
+    static constexpr auto NAME = "IOAdaptor";
 
 public:
-    SharedQueryBlockInputStream(size_t clients, const BlockInputStreamPtr & in_, const String & req_id)
+    IoAdaptorBlockInputStream(size_t clients, const BlockInputStreamPtr & in_, const String & req_id)
         : queue(clients)
         , log(Logger::get(NAME, req_id))
         , in(in_)
@@ -46,7 +41,7 @@ public:
         children.push_back(in);
     }
 
-    ~SharedQueryBlockInputStream()
+    ~IoAdaptorBlockInputStream()
     {
         try
         {
@@ -71,8 +66,9 @@ public:
             return;
         read_prefixed = true;
         /// Start reading thread.
-        thread_manager = newThreadManager();
-        thread_manager->schedule(true, "SharedQuery", [this] { fetchBlocks(); });
+        thread_manager = newIOThreadManager();
+        // for (size_t i = 0; i < concurrency; ++i)
+        thread_manager->schedule(true, "IOAdaptor", [this] { fetchBlocks(); });
     }
 
     void readSuffix() override
@@ -106,16 +102,13 @@ public:
         ptr->cancel(kill);
     }
 
-    virtual void collectNewThreadCountOfThisLevel(int & cnt) override
+    void collectNewThreadCountOfThisLevel(int & cnt) override
     {
         ++cnt;
     }
 
 protected:
-    /// The BlockStreamProfileInfo of SharedQuery is useless,
-    /// and it will trigger tsan UT fail because of data race.
-    /// So overriding method `read` here.
-    Block read(FilterPtr &, bool) override
+    Block readImpl() override
     {
         std::unique_lock lock(mutex);
 
@@ -137,10 +130,6 @@ protected:
 
         return block;
     }
-    Block readImpl() override
-    {
-        throw Exception("Unsupport");
-    }
 
     void fetchBlocks()
     {
@@ -149,7 +138,6 @@ protected:
             in->readPrefix();
             while (true)
             {
-                FAIL_POINT_TRIGGER_EXCEPTION(FailPoints::random_sharedquery_failpoint);
                 Block block = in->read();
                 // in is finished or queue is canceled
                 if (!block || queue.push(block) != MPMCQueueResult::OK)
@@ -192,7 +180,7 @@ private:
     FiberTraits::Mutex mutex;
     std::shared_ptr<ThreadManager> thread_manager;
 
-    std::string exception_msg;
+    String exception_msg;
 
     LoggerPtr log;
     BlockInputStreamPtr in;

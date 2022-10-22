@@ -17,6 +17,7 @@
 #include <Common/MemoryTracker.h>
 #include <DataStreams/IProfilingBlockInputStream.h>
 #include <Flash/Mpp/MPPTaskId.h>
+#include <Common/FiberTraits.h>
 #include <Interpreters/SubqueryForSet.h>
 
 
@@ -94,7 +95,7 @@ private:
     size_t rows_to_transfer = 0;
     size_t bytes_to_transfer = 0;
 
-    std::mutex exception_mutex;
+    FiberTraits::Mutex exception_mutex;
     std::vector<std::exception_ptr> exception_from_workers;
 
     const LoggerPtr log;

@@ -238,7 +238,7 @@ private:
         RUNTIME_ASSERT(error == grpc_call_error::GRPC_CALL_OK, log, "grpc_call_start_batch returns {} != GRPC_CALL_OK, memory of tag may leak", error);
     }
 
-    MPMCQueue<T> send_queue;
+    MPMCQueueFiber<T> send_queue;
 
     const LoggerPtr log;
 
@@ -255,7 +255,7 @@ private:
     /// Thread 1: set the tag.
     ///
     /// If there is no more data, this connection will get stuck forever.
-    std::mutex mu;
+    FiberTraits::Mutex mu;
 
     enum class Status
     {

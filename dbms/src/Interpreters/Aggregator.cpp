@@ -153,7 +153,7 @@ Block Aggregator::Params::getHeader(
 
 Aggregator::Aggregator(const Params & params_, const String & req_id)
     : params(params_)
-    , log(Logger::get(req_id))
+    , log(Logger::get("Aggregator", req_id))
     , isCancelled([]() { return false; })
 {
     if (current_memory_tracker)
@@ -833,6 +833,7 @@ void Aggregator::execute(const BlockInputStreamPtr & stream, AggregatedDataVaria
 
         if (!executeOnBlock(block, result, file_provider, key_columns, aggregate_columns, params.local_delta_memory, no_more_keys))
             break;
+        adaptive_yield();
     }
 
     /// If there was no data, and we aggregate without keys, and we must return single row with the result of empty aggregation.
@@ -1185,6 +1186,7 @@ BlocksList Aggregator::prepareBlocksAndFillTwoLevelImpl(
             /// Select Arena to avoid race conditions
             Arena * arena = data_variants.aggregates_pools.at(thread_id).get();
             blocks.emplace_back(convertOneBucketToBlock(data_variants, method, arena, final, bucket));
+            adaptive_yield();
         }
         return blocks;
     };
@@ -1486,7 +1488,7 @@ public:
       *  which are all either single-level, or are two-level.
       */
     MergingAndConvertingBlockInputStream(const Aggregator & aggregator_, ManyAggregatedDataVariants & data_, bool final_, size_t threads_)
-        : log(Logger::get(aggregator_.log ? aggregator_.log->identifier() : ""))
+        : log(Logger::get("MergingAndConvertingBlockInputStream", aggregator_.log ? aggregator_.log->identifier() : ""))
         , aggregator(aggregator_)
         , data(data_)
         , final(final_)
@@ -1619,8 +1621,8 @@ private:
     {
         std::map<Int32, Block> ready_blocks;
         std::exception_ptr exception;
-        std::mutex mutex;
-        std::condition_variable condvar;
+        FiberTraits::Mutex mutex;
+        FiberTraits::ConditionVariable condvar;
         std::shared_ptr<ThreadPoolManager> thread_pool;
 
         explicit ParallelMergeData(size_t threads)

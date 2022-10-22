@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Common/CurrentMetrics.h>
+#include <Common/FiberPool.h>
 #include <Common/Logger.h>
 #include <Common/MPMCQueue.h>
 #include <Common/MemoryTracker.h>
@@ -201,7 +202,7 @@ private:
           *
           * Therefore, a queue is used. This can be improved in the future.
           */
-        using AvailableInputs = MPMCQueue<InputData>;
+        using AvailableInputs = MPMCQueueFiber<InputData>;
         AvailableInputs available_inputs;
 
         /// How many active input streams.
@@ -211,7 +212,7 @@ private:
           * First, streams are located here.
           * After a stream was prepared, it is moved to "available_inputs" for reading.
           */
-        using UnpreparedInputs = MPMCQueue<InputData>;
+        using UnpreparedInputs = MPMCQueueFiber<InputData>;
         UnpreparedInputs unprepared_inputs;
     };
 
@@ -310,6 +311,7 @@ private:
             {
                 work.available_inputs.push(input);
                 publishPayload(input.in, block, thread_num);
+                adaptive_yield();
             }
             else
             {
@@ -319,6 +321,7 @@ private:
                     break;
                 }
             }
+            adaptive_yield();
         }
     }
 

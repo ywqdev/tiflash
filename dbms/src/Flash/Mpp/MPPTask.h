@@ -130,7 +130,7 @@ private:
     std::atomic<TaskStatus> status{INITIALIZING};
     String err_string;
 
-    std::mutex tunnel_and_receiver_mu;
+    FiberTraits::Mutex tunnel_and_receiver_mu;
 
     MPPTunnelSetPtr tunnel_set;
 

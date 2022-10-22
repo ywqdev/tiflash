@@ -23,6 +23,7 @@
 #include <tipb/select.pb.h>
 #pragma GCC diagnostic pop
 
+#include <Common/MPMCQueue.h>
 #include <Common/ConcurrentBoundedQueue.h>
 #include <Common/Logger.h>
 #include <DataStreams/BlockIO.h>
@@ -229,20 +230,22 @@ public:
     /// This method is not thread-safe.
     void consumeWarnings(std::vector<tipb::Error> & warnings_)
     {
-        const size_t warnings_size = warnings.size();
-        warnings_.reserve(warnings_size);
-        for (size_t i = 0; i < warnings_size; ++i)
+        while (true)
         {
             tipb::Error error;
-            warnings.pop(error);
+            if (warnings.tryPop(error) != MPMCQueueResult::OK)
+                break;
             warnings_.push_back(error);
         }
     }
+
     void clearWarnings()
     {
-        warnings.clear();
+        std::vector<tipb::Error> tmp;
+        consumeWarnings(tmp);
         warning_count = 0;
     }
+
     UInt64 getWarningCount() { return warning_count; }
     const mpp::TaskMeta & getMPPTaskMeta() const { return mpp_task_meta; }
     bool isBatchCop() const { return is_batch_cop; }
@@ -385,7 +388,7 @@ private:
     const MPPTaskId mpp_task_id = MPPTaskId::unknown_mpp_task_id;
     /// max_recorded_error_count is the max error/warning need to be recorded in warnings
     UInt64 max_recorded_error_count;
-    ConcurrentBoundedQueue<tipb::Error> warnings;
+    MPMCQueueFiber<tipb::Error> warnings;
     /// warning_count is the actual warning count during the entire execution
     std::atomic<UInt64> warning_count;
 

@@ -261,7 +261,7 @@ void MPPTunnel::waitForSenderFinish(bool allow_throw)
     LOG_TRACE(log, "end wait for consumer finish!");
 }
 
-void MPPTunnel::waitUntilConnectedOrFinished(std::unique_lock<std::mutex> & lk)
+void MPPTunnel::waitUntilConnectedOrFinished(std::unique_lock<FiberTraits::Mutex> & lk)
 {
     auto not_unconnected = [&] {
         return (status != TunnelStatus::Unconnected);

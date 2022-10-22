@@ -22,6 +22,7 @@
 #include <Common/Arena.h>
 #include <Common/ColumnsHashing.h>
 #include <Common/Decimal.h>
+#include <Common/FiberPool.h>
 #include <Common/HashTable/FixedHashMap.h>
 #include <Common/HashTable/HashMap.h>
 #include <Common/HashTable/StringHashMap.h>
@@ -899,7 +900,7 @@ public:
         std::vector<std::unique_ptr<Poco::TemporaryFile>> files;
         size_t sum_size_uncompressed = 0;
         size_t sum_size_compressed = 0;
-        mutable std::mutex mutex;
+        mutable FiberTraits::Mutex mutex;
 
         bool empty() const
         {

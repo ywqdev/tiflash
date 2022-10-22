@@ -99,7 +99,7 @@ public:
         const String & req_id,
         ExceptionCallback exception_callback_ = ExceptionCallback())
         : output_queue(std::min(std::max(inputs.size(), additional_inputs_at_end.size()), max_threads) * 5) // reduce contention
-        , log(Logger::get(req_id))
+        , log(Logger::get(NAME, req_id))
         , handler(*this)
         , processor(inputs, additional_inputs_at_end, max_threads, handler, log)
         , exception_callback(exception_callback_)
@@ -178,12 +178,14 @@ protected:
             UnionBlockInputStreamImpl::OutputData<mode> res;
             while (true)
             {
+                // std::cout << "before pop res" << std::endl;
                 output_queue.pop(res);
-
+                // std::cout << "after pop res" << std::endl;
                 if (res.exception)
                 {
                     if (!exception)
                         exception = res.exception;
+
                     else if (Exception * e = exception_cast<Exception *>(exception))
                         e->addMessage("\n" + getExceptionMessage(res.exception, false));
                 }
@@ -193,6 +195,7 @@ protected:
 
             all_read = true;
         }
+        // std::cout << "all read?" << std::endl;
 
         processor.wait();
 
@@ -228,7 +231,9 @@ protected:
         }
 
         /// We will wait until the next block is ready or an exception is thrown.
+        // std::cout << "before pop" << std::endl;
         output_queue.pop(received_payload);
+        // std::cout << "After pop" << std::endl;
 
         if (received_payload.exception)
         {
@@ -268,7 +273,7 @@ private:
 
 private:
     using Payload = UnionBlockInputStreamImpl::OutputData<mode>;
-    using OutputQueue = MPMCQueue<Payload>;
+    using OutputQueue = MPMCQueueFiber<Payload>;
 
 private:
     /** The queue of the finished blocks. Also, you can put an exception instead of a block.
@@ -278,7 +283,7 @@ private:
       *  otherwise ParallelInputsProcessor can be blocked during insertion into the queue.
       */
     OutputQueue output_queue;
-    std::mutex mu;
+    FiberTraits::Mutex mu;
     bool meet_exception = false;
 
     void handleException(const std::exception_ptr & exception)

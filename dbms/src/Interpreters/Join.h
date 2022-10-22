@@ -300,7 +300,7 @@ private:
       */
     BlocksList blocks;
     /// mutex to protect concurrent insert to blocks
-    std::mutex blocks_lock;
+    FiberTraits::Mutex blocks_lock;
     /// keep original block for concurrent build
     Blocks original_blocks;
 
@@ -329,8 +329,8 @@ private:
     /// Block with key columns in the same order they appear in the right-side table.
     Block sample_block_with_keys;
 
-    mutable std::mutex build_table_mutex;
-    mutable std::condition_variable build_table_cv;
+    mutable FiberTraits::Mutex build_table_mutex;
+    mutable FiberTraits::ConditionVariable build_table_cv;
     BuildTableState build_table_state;
 
     const LoggerPtr log;
@@ -345,7 +345,7 @@ private:
       *  and StorageJoin only calls these two methods.
       * That's why another methods are not guarded.
       */
-    mutable std::shared_mutex rwlock;
+    mutable FiberTraits::SharedMutex rwlock;
 
     bool initialized = false;
 

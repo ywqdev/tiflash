@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Common/DynamicThreadPool.h>
+#include <Common/FiberPool.h>
 #include <Common/ThreadFactory.h>
 #include <Common/ThreadManager.h>
 #include <Common/wrapInvocable.h>
@@ -22,8 +23,10 @@ namespace DB
 namespace
 {
 // may throw
-void waitTasks(std::vector<std::future<void>> & futures)
+template <typename Future>
+void waitTasks(std::vector<Future> & futures)
 {
+    // std::cout << "fiber wait tasks fininshed." << std::endl;
     std::exception_ptr first_exception;
     for (auto & future : futures)
     {
@@ -54,11 +57,15 @@ public:
 
     void schedule(bool propagate_memory_tracker, std::string /*thread_name*/, ThreadManager::Job job) override
     {
+        // std::cout << "dynamic schedule..." << std::endl;
+
         futures.push_back(DynamicThreadPool::global_instance->schedule(propagate_memory_tracker, std::move(job)));
     }
 
     void schedule(bool propagate_memory_tracker, ThreadPoolManager::Job job) override
     {
+        // std::cout << "dynamic schedule..." << std::endl;
+
         futures.push_back(DynamicThreadPool::global_instance->schedule(propagate_memory_tracker, std::move(job)));
     }
 
@@ -71,11 +78,44 @@ protected:
     std::vector<std::future<void>> futures;
 };
 
+
+class FiberManager : public ThreadManager
+    , public ThreadPoolManager
+{
+public:
+    void scheduleThenDetach(bool /*propagate_memory_tracker*/, String /*thread_name*/, ThreadManager::Job job) override
+    {
+        // std::cout << "fiber schedule then detach" << std::endl;
+        DefaultFiberPool::submitJob(job);
+    }
+
+    void schedule(bool /*propagate_memory_tracker*/, String /*thread_name*/, ThreadManager::Job job) override
+    {
+        // std::cout << "fiber schedule..." << std::endl;
+        futures.push_back(DefaultFiberPool::submitJob(job).value());
+    }
+
+    void schedule(bool /*propagate_memory_tracker*/, ThreadPoolManager::Job job) override
+    {
+        // std::cout << "fiber schedule..." << std::endl;
+        futures.push_back(DefaultFiberPool::submitJob(job).value());
+    }
+
+    void wait() override
+    {
+        waitTasks(futures);
+    }
+
+protected:
+    std::vector<boost::fibers::future<void>> futures;
+};
+
 class RawThreadManager : public ThreadManager
 {
 public:
     void schedule(bool propagate_memory_tracker, std::string thread_name, Job job) override
     {
+        // std::cout << "raw schedule..." << std::endl;
         auto t = ThreadFactory::newThread(propagate_memory_tracker, std::move(thread_name), std::move(job));
         workers.push_back(std::move(t));
     }
@@ -131,18 +171,48 @@ protected:
 
 std::shared_ptr<ThreadManager> newThreadManager()
 {
+    // #ifdef TIFLASH_USE_FIBER
+    // std::cout << "new fiber thread manager.." << std::endl;
+    return std::make_shared<FiberManager>();
+    // #else
+    // if (DynamicThreadPool::global_instance)
+    // return std::make_shared<DynamicThreadManager>();
+    // else
+    // return std::make_shared<RawThreadManager>();
+    // #endif
+}
+
+std::shared_ptr<ThreadManager> newDefaultThreadManager()
+{
+    // std::cout << "new default thread manager.." << std::endl;
+
     if (DynamicThreadPool::global_instance)
         return std::make_shared<DynamicThreadManager>();
     else
         return std::make_shared<RawThreadManager>();
 }
 
-std::shared_ptr<ThreadPoolManager> newThreadPoolManager(size_t capacity)
+std::shared_ptr<ThreadManager> newIOThreadManager()
 {
     if (DynamicThreadPool::global_instance)
+    {
+        // std::cout << "dynamic thread manager..." << std::endl;
         return std::make_shared<DynamicThreadManager>();
+    }
     else
-        return std::make_shared<FixedThreadPoolManager>(capacity);
+        return std::make_shared<RawThreadManager>();
+}
+
+std::shared_ptr<ThreadPoolManager> newThreadPoolManager(size_t capacity [[maybe_unused]])
+{
+    // #ifdef TIFLASH_USE_FIBER
+    return std::make_shared<FiberManager>();
+    // #else
+    // if (DynamicThreadPool::global_instance)
+    // return std::make_shared<DynamicThreadManager>();
+    // else
+    // return std::make_shared<FixedThreadPoolManager>(capacity);
+    // #endif
 }
 
 } // namespace DB

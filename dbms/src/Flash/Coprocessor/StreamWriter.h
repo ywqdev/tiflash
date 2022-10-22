@@ -25,8 +25,9 @@
 #ifdef __clang__
 #pragma clang diagnostic pop
 #endif
-#include <mutex>
+#include <Common/FiberTraits.h>
 
+#include <mutex>
 namespace mpp
 {
 class MPPDataPacket;
@@ -37,7 +38,7 @@ namespace DB
 struct StreamWriter
 {
     ::grpc::ServerWriter<::coprocessor::BatchResponse> * writer;
-    std::mutex write_mutex;
+    FiberTraits::Mutex write_mutex;
 
     explicit StreamWriter(::grpc::ServerWriter<::coprocessor::BatchResponse> * writer_)
         : writer(writer_)

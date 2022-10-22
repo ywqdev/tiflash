@@ -169,7 +169,7 @@ public:
     using Self = AsyncRequestHandler<RPCContext, enable_fine_grained_shuffle>;
 
     AsyncRequestHandler(
-        MPMCQueue<Self *> * queue,
+        MPMCQueueFiber<Self *> * queue,
         std::vector<MsgChannelPtr> * msg_channels_,
         const std::shared_ptr<RPCContext> & context,
         const Request & req,
@@ -386,7 +386,7 @@ private:
 
     std::shared_ptr<RPCContext> rpc_context;
     const Request * request; // won't be null
-    MPMCQueue<Self *> * notify_queue; // won't be null
+    MPMCQueueFiber<Self *> * notify_queue; // won't be null
     std::vector<MsgChannelPtr> * msg_channels; // won't be null
 
     String req_info;
@@ -402,7 +402,7 @@ private:
     size_t read_packet_index = 0;
     Status finish_status = RPCContext::getStatusOK();
     LoggerPtr log;
-    std::mutex mu;
+    FiberTraits::Mutex mu;
 };
 } // namespace
 
@@ -431,12 +431,12 @@ ExchangeReceiverBase<RPCContext>::ExchangeReceiverBase(
         {
             for (size_t i = 0; i < max_streams_; ++i)
             {
-                msg_channels.push_back(std::make_unique<MPMCQueue<std::shared_ptr<ReceivedMessage>>>(max_buffer_size));
+                msg_channels.push_back(std::make_unique<MPMCQueueFiber<std::shared_ptr<ReceivedMessage>>>(max_buffer_size));
             }
         }
         else
         {
-            msg_channels.push_back(std::make_unique<MPMCQueue<std::shared_ptr<ReceivedMessage>>>(max_buffer_size));
+            msg_channels.push_back(std::make_unique<MPMCQueueFiber<std::shared_ptr<ReceivedMessage>>>(max_buffer_size));
         }
         rpc_context->fillSchema(schema);
         setUpConnection();
@@ -534,7 +534,7 @@ void ExchangeReceiverBase<RPCContext>::reactor(const std::vector<Request> & asyn
     CPUAffinityManager::getInstance().bindSelfQueryThread();
 
     size_t alive_async_connections = async_requests.size();
-    MPMCQueue<AsyncHandler *> ready_requests(alive_async_connections * 2);
+    MPMCQueueFiber<AsyncHandler *> ready_requests(alive_async_connections * 2);
     std::vector<AsyncHandler *> waiting_for_retry_requests;
 
     std::vector<std::unique_ptr<AsyncHandler>> handlers;

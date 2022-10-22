@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <Common/FailPoint.h>
+#include <Common/FiberPool.h>
 #include <Common/ThreadFactory.h>
 #include <Common/ThreadManager.h>
 #include <DataStreams/CreatingSetsBlockInputStream.h>
@@ -244,6 +245,7 @@ void CreatingSetsBlockInputStream::createOne(SubqueryForSet & subquery)
 
                 break;
             }
+            adaptive_yield();
         }
 
 

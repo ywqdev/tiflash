@@ -32,6 +32,8 @@ public:
 };
 
 std::shared_ptr<ThreadManager> newThreadManager();
+std::shared_ptr<ThreadManager> newDefaultThreadManager();
+std::shared_ptr<ThreadManager> newIOThreadManager();
 
 class ThreadPoolManager
 {

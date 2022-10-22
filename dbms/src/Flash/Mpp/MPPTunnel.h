@@ -68,7 +68,7 @@ public:
     virtual ~TunnelSender() = default;
     TunnelSender(size_t queue_size, MemoryTrackerPtr & memory_tracker_, const LoggerPtr & log_, const String & tunnel_id_)
         : memory_tracker(memory_tracker_)
-        , send_queue(MPMCQueue<TrackedMppDataPacketPtr>(queue_size))
+        , send_queue(MPMCQueueFiber<TrackedMppDataPacketPtr>(queue_size))
         , log(log_)
         , tunnel_id(tunnel_id_)
     {
@@ -135,12 +135,12 @@ protected:
         }
 
     private:
-        std::promise<String> promise;
-        std::shared_future<String> future;
+        FiberTraits::Promise<String> promise;
+        FiberTraits::SharedFuture<String> future;
         std::atomic<bool> msg_has_set{false};
     };
     MemoryTrackerPtr memory_tracker;
-    MPMCQueue<TrackedMppDataPacketPtr> send_queue;
+    MPMCQueueFiber<TrackedMppDataPacketPtr> send_queue;
     ConsumerState consumer_state;
     const LoggerPtr log;
     const String tunnel_id;
@@ -320,7 +320,7 @@ private:
 
     StringRef statusToString();
 
-    void waitUntilConnectedOrFinished(std::unique_lock<std::mutex> & lk);
+    void waitUntilConnectedOrFinished(std::unique_lock<FiberTraits::Mutex> & lk);
 
     void waitForSenderFinish(bool allow_throw);
 
@@ -329,8 +329,8 @@ private:
         return mem_tracker ? mem_tracker.get() : nullptr;
     }
 
-    std::mutex mu;
-    std::condition_variable cv_for_status_changed;
+    FiberTraits::Mutex mu;
+    FiberTraits::ConditionVariable cv_for_status_changed;
 
     TunnelStatus status;
 

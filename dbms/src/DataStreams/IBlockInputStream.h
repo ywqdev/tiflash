@@ -15,6 +15,7 @@
 #pragma once
 
 #include <Common/FmtUtils.h>
+#include <Common/FiberTraits.h>
 #include <Core/Block.h>
 #include <Core/SortDescription.h>
 #include <Storages/TableLockHolder.h>
@@ -181,14 +182,14 @@ public:
 
 protected:
     BlockInputStreams children;
-    mutable std::shared_mutex children_mutex;
+    mutable FiberTraits::SharedMutex children_mutex;
     bool collected = false; // a flag to avoid duplicated collecting, since some InputStream is shared by multiple inputStreams
 
 private:
     TableLockHolders table_locks;
 
     size_t checkDepthImpl(size_t max_depth, size_t level) const;
-    mutable std::mutex tree_id_mutex;
+    mutable FiberTraits::Mutex tree_id_mutex;
     mutable String tree_id;
 
     /// The info that hints why the inputStream is needed to run.

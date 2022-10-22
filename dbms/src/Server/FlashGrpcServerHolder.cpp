@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+#include "Common/ThreadManager.h"
 #include <Flash/EstablishCall.h>
 #include <Server/FlashGrpcServerHolder.h>
 
@@ -123,7 +124,7 @@ FlashGrpcServerHolder::FlashGrpcServerHolder(Context & context, Poco::Util::Laye
     // Prevent TiKV from throwing "Received message larger than max (4404462 vs. 4194304)" error.
     builder.SetMaxReceiveMessageSize(-1);
     builder.SetMaxSendMessageSize(-1);
-    thread_manager = DB::newThreadManager();
+    thread_manager = DB::newDefaultThreadManager();
     int async_cq_num = context.getSettingsRef().async_cqs;
     if (enable_async_server)
     {

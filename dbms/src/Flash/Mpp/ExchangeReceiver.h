@@ -113,7 +113,7 @@ enum class ExchangeReceiverState
     CLOSED,
 };
 
-using MsgChannelPtr = std::unique_ptr<MPMCQueue<std::shared_ptr<ReceivedMessage>>>;
+using MsgChannelPtr = std::unique_ptr<MPMCQueueFiber<std::shared_ptr<ReceivedMessage>>>;
 
 template <typename RPCContext>
 class ExchangeReceiverBase
@@ -209,7 +209,7 @@ private:
 
     std::vector<MsgChannelPtr> msg_channels;
 
-    std::mutex mu;
+    FiberTraits::Mutex mu;
     /// should lock `mu` when visit these members
     Int32 live_connections;
     ExchangeReceiverState state;
