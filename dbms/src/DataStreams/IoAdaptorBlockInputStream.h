@@ -35,6 +35,7 @@ class IoAdaptorBlockInputStream : public IProfilingBlockInputStream
 public:
     IoAdaptorBlockInputStream(size_t clients, const BlockInputStreamPtr & in_, const String & req_id)
         : queue(clients)
+        , concurrency(clients)
         , log(Logger::get(NAME, req_id))
         , in(in_)
     {
@@ -67,8 +68,8 @@ public:
         read_prefixed = true;
         /// Start reading thread.
         thread_manager = newIOThreadManager();
-        // for (size_t i = 0; i < concurrency; ++i)
-        thread_manager->schedule(true, "IOAdaptor", [this] { fetchBlocks(); });
+        for (int i = 0; i < concurrency; ++i)
+            thread_manager->schedule(true, "IOAdaptor", [this] { fetchBlocks(); });
     }
 
     void readSuffix() override
@@ -178,6 +179,7 @@ private:
     bool read_suffixed = false;
 
     FiberTraits::Mutex mutex;
+    int concurrency;
     std::shared_ptr<ThreadManager> thread_manager;
 
     String exception_msg;
