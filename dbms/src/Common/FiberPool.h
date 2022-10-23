@@ -35,7 +35,7 @@ namespace FiberPool
 inline auto
 no_of_defualt_threads()
 {
-    return std::max(std::thread::hardware_concurrency(), 2u) - 1u;
+    return std::max(std::thread::hardware_concurrency() * 10, 2u) - 1u;
 }
 
 /**
