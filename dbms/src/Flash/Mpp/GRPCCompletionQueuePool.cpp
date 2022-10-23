@@ -14,7 +14,7 @@
 
 #include <Common/TiFlashMetrics.h>
 #include <Flash/Mpp/GRPCCompletionQueuePool.h>
-
+#include <Common/FiberPool.h>
 namespace DB
 {
 std::unique_ptr<GRPCCompletionQueuePool> GRPCCompletionQueuePool::global_instance;
@@ -61,6 +61,7 @@ void GRPCCompletionQueuePool::thread(size_t index)
         }
         using Callback = UnaryCallback<bool>;
         reinterpret_cast<Callback *>(got_tag)->execute(ok);
+        adaptive_yield();
     }
 }
 

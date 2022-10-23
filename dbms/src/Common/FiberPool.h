@@ -5,9 +5,13 @@
 #pragma once
 
 #include <Common/BitHelpers.h>
+#include <Common/TiFlashMetrics.h>
 #include <Common/setThreadName.h>
 
 #include <boost/fiber/all.hpp>
+
+namespace DB
+{
 
 inline thread_local bool g_run_in_fiber = false;
 
@@ -31,7 +35,7 @@ namespace FiberPool
 inline auto
 no_of_defualt_threads()
 {
-    return std::max(std::thread::hardware_concurrency() * 20, 2u) - 1u;
+    return std::max(std::thread::hardware_concurrency(), 2u) - 1u;
 }
 
 /**
@@ -306,6 +310,8 @@ private:
         // fiber sharing
         //
 
+        UPDATE_CUR_AND_MAX_METRIC(tiflash_thread_count, type_total_threads_of_raw, type_max_threads_of_raw);
+
 
         if constexpr (work_stealing)
         {
@@ -445,3 +451,4 @@ close()
 }
 
 } // namespace DefaultFiberPool
+} // namespace DB

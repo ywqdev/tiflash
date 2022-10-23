@@ -231,9 +231,7 @@ protected:
         }
 
         /// We will wait until the next block is ready or an exception is thrown.
-        // std::cout << "before pop" << std::endl;
         output_queue.pop(received_payload);
-        // std::cout << "After pop" << std::endl;
 
         if (received_payload.exception)
         {

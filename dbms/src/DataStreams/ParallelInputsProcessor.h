@@ -298,6 +298,7 @@ private:
             input.in->readPrefix();
 
             work.available_inputs.push(input);
+            adaptive_yield();
         }
 
         // The condition is false when all input streams are exhausted or

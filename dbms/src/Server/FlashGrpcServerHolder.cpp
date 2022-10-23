@@ -13,8 +13,8 @@
 // limitations under the License.
 #include "Common/ThreadManager.h"
 #include <Flash/EstablishCall.h>
+#include <Common/FiberPool.h>
 #include <Server/FlashGrpcServerHolder.h>
-
 
 namespace DB
 {
@@ -76,6 +76,7 @@ void handleRpcs(grpc::ServerCompletionQueue * curcq, const LoggerPtr & log)
             LOG_ERROR(log, "handleRpcs meets error: {}", err_msg);
             throw;
         }
+        adaptive_yield();
     }
 }
 } // namespace

@@ -15,6 +15,7 @@
 #include <Common/CPUAffinityManager.h>
 #include <Common/Exception.h>
 #include <Common/FailPoint.h>
+#include <Common/FiberPool.h>
 #include <Common/ThreadFactory.h>
 #include <Common/TiFlashMetrics.h>
 #include <Flash/Coprocessor/CoprocessorReader.h>
@@ -633,6 +634,8 @@ void ExchangeReceiverBase<RPCContext>::readLoop(const Request & req)
                     local_err_msg = fmt::format("Push mpp packet failed. {}", getStatusString());
                     break;
                 }
+
+                adaptive_yield();
             }
             // if meet error, such as decode packet fails, it will not retry.
             if (meet_error)
