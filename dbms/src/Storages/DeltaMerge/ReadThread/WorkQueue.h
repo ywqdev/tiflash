@@ -18,6 +18,7 @@
 #include <condition_variable>
 #include <mutex>
 #include <queue>
+#include <Common/FiberTraits.h>
 
 namespace DB::DM
 {
@@ -25,10 +26,10 @@ template <typename T>
 class WorkQueue
 {
     // Protects all member variable access
-    std::mutex mu;
-    std::condition_variable reader_cv;
-    std::condition_variable writer_cv;
-    std::condition_variable finish_cv;
+    FiberTraits::Mutex mu;
+    FiberTraits::ConditionVariable reader_cv;
+    FiberTraits::ConditionVariable writer_cv;
+    FiberTraits::ConditionVariable finish_cv;
     std::queue<T> queue;
     bool done;
     std::size_t max_size;
@@ -126,7 +127,7 @@ public:
       bool tryPop(T & item)
      {
         {
-            std::unique_lock<std::mutex> lock(mu);
+            std::unique_lock lock(mu);
             pop_times++;
             if (queue.empty())
             {

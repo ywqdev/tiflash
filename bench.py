@@ -7,8 +7,8 @@ import datetime
 
 target_addr = "127.0.0.1"
 target_user = "root"
-target_database = "test"
-target_port = 4000
+target_database = "tpch_100"
+target_port = 6003
 q2 = """select
     s_acctbal,
     s_name,
@@ -197,6 +197,7 @@ group by
 order by
     cntrycode;"""
 
+
 class Sql:
     def __init__(self, sql, sql_name):
         self.sql = sql
@@ -204,78 +205,71 @@ class Sql:
         self.total_time = 0
         self.total_count = 0
         self.lock = threading.Lock()
-    
+
     def getSqlName(self):
         return self.sql_name
-    
+
     def getSql(self):
         return self.sql
-    
+
     def addInfo(self, executed_time):
-        lock.acquire()
+        self.lock.acquire()
         self.total_time += executed_time
         self.total_count += 1
-        lock.release()
+        self.lock.release()
 
     def getAvgTime(self):
-        lock.acquire()
+        self.lock.acquire()
         avg = 0
         if self.total_count != 0:
             avg = self.total_time / self.total_count
-        lock.release()
+        self.lock.release()
         return avg
-    
+
     def getCount(self):
-        lock.acquire()
+        self.lock.acquire()
         count = self.total_count
-        lock.release()
+        self.lock.release()
         return count
-    
+
     def getInfo(self):
-        info = "%s[avg time: %fs, total count:%d]" % (self.sql_name, self.getAvgTime(), self.getCount())
+        info = "%s[avg time: %fs, total count:%d]" % (
+            self.sql_name, self.getAvgTime(), self.getCount())
         return info
 
 
-sqls = {1: Sql(q2, "Q2"), 2: Sql(q6, "Q6"), 3: Sql(q12, "Q12"), 4: Sql(q11, "Q11"), 5: Sql(q19, "Q19"), 6: Sql(q14, "Q14"), 7: Sql(q22, "Q22")}
+# sqls = {1: Sql(q2, "Q2"), 2: Sql(q6, "Q6"), 3: Sql(q12, "Q12"), 4: Sql(
+#     q11, "Q11"), 5: Sql(q19, "Q19"), 6: Sql(q14, "Q14"), 7: Sql(q22, "Q22")}
 
-lock = threading.Lock()
-isShutdown = False
+sqls = {1: Sql(q6, "Q6"), 2: Sql(q12, "Q12"), 3: Sql(
+    q11, "Q11"), 4: Sql(q19, "Q19"), 5: Sql(q14, "Q14"), 6: Sql(q22, "Q22")}
+
 
 def runClient():
     print("%s start..." % threading.current_thread().getName())
-    connection = pymysql.connect(host=target_addr, port=target_port, user=target_user, database=target_database, cursorclass=pymysql.cursors.DictCursor)
+    connection = pymysql.connect(host=target_addr, port=target_port, user=target_user,
+                                 database=target_database, cursorclass=pymysql.cursors.DictCursor)
     isFirst = False
     with connection:
         with connection.cursor() as cursor:
-            while True:
-                if isFirst == False:
-                    cursor.execute("set tidb_enforce_mpp=1;")
-                    isFirst = True
-                idx = random.randint(1, len(sqls))
-                sql = sqls[idx].getSql()
-                print("Sql: ", sqls[idx].getSqlName())
+            if isFirst == False:
+                cursor.execute("set tidb_enforce_mpp=1;")
+                isFirst = True
+            for j in range(1, len(sqls) + 1):
+                sql = sqls[j].getSql()
+                print("Sql: ", sqls[j].getSqlName())
                 start = time.time()
                 cursor.execute(sql)
                 end = time.time()
-                sqls[idx].addInfo(end - start)
+                sqls[j].addInfo(end - start)
                 print("execution time: ", end - start)
-                # result = cursor.fetchall()
-                # print(result)
-                # for line in result:
-                #     print(line["id"], line["task"])
-                lock.acquire()
-                if isShutdown == True:
-                    lock.release()
-                    print("%s exit..." % threading.current_thread().getName())
-                    return
-                lock.release()
 
 
 def parse_args():
     description = "you should add those parameter"
     parser = argparse.ArgumentParser(description=description)
-    parser.add_argument('--c_num', type=int, default=1, help='client number, default 1')
-    parser.add_argument('--t_time', type=int, default=30, help="test time(seconds), default 30s")
+    parser.add_argument('--c_num', type=int, default=1,
+                        help='client number, default 1')
     args = parser.parse_args()
     return args
 
@@ -283,7 +277,6 @@ def parse_args():
 if __name__ == "__main__":
     args = parse_args()
     client_num = args.c_num
-    test_time = args.t_time
 
     threads = []
     while (client_num > 0):
@@ -293,11 +286,6 @@ if __name__ == "__main__":
         client_num -= 1
 
     start = time.time()
-    time.sleep(test_time)
-
-    lock.acquire()
-    isShutdown = True
-    lock.release()
 
     for thread in threads:
         thread.join()
